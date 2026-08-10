@@ -10,41 +10,25 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+//import routes
+const provinceRoutes = require('./routes/provinces');
+const districtRoutes = require('./routes/districts');
+const accidentRoutes = require('./routes/accidents');
+const risk_scoresRoutes = require('./routes/risk_scores');
+const hotspotsRoutes = require('./routes/hotspots');
+const summariesRoutes = require('./routes/summaries');
+
 //api ทดสอบว่า server ทำงานได้ปกติไหม
 app.get('/', (req, res) => {
     res.send('Accident Database API is running!');
 });
 
-//api ดีงรายชื่อจังหวัดทั้งหมด
-app.get('/api/provinces', async (req,res) => {
-    try {
-        const [rows] = await db.query('SELECT * FROM provinces ORDER BY pro_name_th ASC');
-        res.json({success: true, count: rows.length, data: rows});
-    } catch (error) {
-        console.error('Error fetching provinces: ', error);
-        res.status(500).json({success: false, message: 'Database query error'});
-    }
-});
-
-//api ดีงรายชื่ออำเภอ ตามรหัสจังหวัด (/api/districts?provinces_code=10)
-app.get('/api/districts', async (req, res) => {
-    const { province_code } = req.query;
-    try {
-        let sql = 'SELECT * FROM districts';
-        let params = [];
-
-        if(province_code) {
-            sql += ' WHERE province_code = ?';
-            params.push(province_code); 
-        }
-
-        const [rows] = await db.query(sql, params);
-        res.json({success: true, count: rows.length, data: rows});
-    } catch (error) {
-        console.error('Error fetching districts: ', error);
-        res.status(500).json({success: false, message: 'Database query error'});
-    }
-});
+app.use('/api/provinces', provinceRoutes);
+app.use('/api/districts', districtRoutes);
+app.use('/api/accidents', accidentRoutes);
+app.use('/api/risk_scores', risk_scoresRoutes);
+app.use('/api/hotspots', hotspotsRoutes);
+app.use('/api/summaries', summariesRoutes);
 
 //สั่งให้ server ทำงาน
 app.listen(PORT, () => {
