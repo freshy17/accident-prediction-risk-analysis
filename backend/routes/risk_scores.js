@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
             SELECT r.*, p.pro_name_th, d.dis_name_th
             FROM risk_scores r
             LEFT JOIN provinces p ON r.province_code = p.province_code
-            LEFT JOIN districts d ON r.province_code = d.province_code
+            LEFT JOIN districts d ON r.district_code = d.district_code
         `;
         let params = [];
         let conditions = [];
