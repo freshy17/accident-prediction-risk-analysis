@@ -150,4 +150,17 @@ router.get('/compare', async (req, res) => {
     }
 });
 
+//GET: /api/summaries/years (เพื่อดึงปีทั้งหมดที่มีใน Database ไว้ใส่ใน Dropdown)
+router.get('/years', async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT DISTINCT year FROM summaries ORDER BY year DESC');
+        //ส่งข้อมูลกลับมาเป็น array ex: [2025, 2024, 2023, 2022, 2021]
+        const years = rows.map(item => item.year);
+        res.json({ success: true, data: years });
+    } catch (error) {
+        console.error('Error fetching years: ', error);
+        res.status(500).json({ success: false, message: 'Database query error', error: error.message });
+    }
+});
+
 module.exports = router;
