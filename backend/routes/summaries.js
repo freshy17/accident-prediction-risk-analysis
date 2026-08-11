@@ -109,7 +109,7 @@ router.get('/top10', async (req, res) => {
 })
 
 //GET: /api/summaries/compare (กราฟเปรียบเทียบ ปกติ & หยุดปีใหม่ & สงกรานต์)
-router.get('/compare', (req, res) => {
+router.get('/compare', async (req, res) => {
     const { province_code, year } = req.query;
 
     try {
