@@ -1,5 +1,5 @@
 import React from "react";
-import { Filter, Flame, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 const FilterBar = ({ filters, setfilters, yearList, provinceList, onReset }) => {
   const handleChange = (e) => {
@@ -12,11 +12,6 @@ const FilterBar = ({ filters, setfilters, yearList, provinceList, onReset }) => 
 
   return (
     <div className="filter-card">
-      <div className="filter-header">
-        <Filter size={16} color="#2563eb" />
-        <span>ตัวกรองข้อมูล (Filters)</span>
-      </div>
-
       <div className="filter-grid">
         {/*  เลืือกปี */}
         <div className="form-group">
@@ -44,7 +39,7 @@ const FilterBar = ({ filters, setfilters, yearList, provinceList, onReset }) => 
             onChange={handleChange}
             className="form-select"
           >
-            <option value="">-- ทั้งประเทศ --</option>
+            <option value="">ทั้งประเทศ</option>
             {provinceList?.map((prov) => (
               <option key={prov.code} value={prov.code}>
                 {prov.name_th}
@@ -69,7 +64,7 @@ const FilterBar = ({ filters, setfilters, yearList, provinceList, onReset }) => 
           </select>
         </div>
 
-        {/*  ปรพเภทวัน + ปุ่ม Reset */}
+        {/*  ประเภทวัน + ปุ่ม Reset */}
         <div className="filter-action-group">
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label">ประเภทวัน</label>

@@ -50,12 +50,6 @@ html, body, #root {
   justify-content: center;
 }
 
-.icon-box svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: #ffffff;
-}
-
 .navbar-title {
   font-size: 1.5rem;
   font-weight: 500;
@@ -73,16 +67,6 @@ html, body, #root {
 .filter-card {
   width: 100%;
   box-sizing: border-box;
-}
-
-.filter-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  color: #334155;
-  font-weight: 600;
-  font-size: 0.875rem;
 }
 
 .filter-grid {
@@ -124,10 +108,6 @@ html, body, #root {
   border-radius: 0.5rem;
   padding: 0.625rem;
   outline: none;
-}
-
-.form-select:focus {
-  border-color: #3b82f6;
 }
 
 .filter-action-group {
@@ -228,4 +208,55 @@ html, body, #root {
   font-size: 0.875rem;
   font-weight: 700;
   border-radius: 9999px;
+}
+
+/* MapView */
+.map.card {
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.map-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: #1e293b;
+}
+
+.map-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* กรอบบังคับขนาดแผนที่ */
+.map-container-wrapper {
+  height: 450px;
+  width: 50%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* เนื้อหาใน Pop-up */
+.popup-content {
+  padding: 0.25rem;
+}
+
+.popup-title {
+  margin: 0 0 0.5rem 0;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.popup-details {
+  font-size: 0.85rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }

@@ -2,6 +2,7 @@ import React, {useState} from "react";
 import NavBar from "../components/Navbar";
 import FilterBar from "../components/FilterBar";
 import SummaryCards from "../components/SummaryCards";
+import MapView from "../components/MapView";
 
 const Dashboard = () => {
     const mockYears = [{ year: '2024'}, { year: '2023' }];
@@ -46,6 +47,7 @@ const Dashboard = () => {
                     onReset={handleReset}
                 />
                 <SummaryCards isFiltered={isFiltered} data={mockSummaryData}/>
+                <MapView />
             </main>
         </div>
     );
