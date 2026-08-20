@@ -3,6 +3,8 @@ import NavBar from "../components/Navbar";
 import FilterBar from "../components/FilterBar";
 import SummaryCards from "../components/SummaryCards";
 import MapView from "../components/MapView";
+import Top10Chart from "../components/Top10Chart";
+import HolidayCompareChart from "../components/็HolidayCompareChart";
 
 const Dashboard = () => {
     const mockYears = [{ year: '2024'}, { year: '2023' }];
@@ -47,7 +49,11 @@ const Dashboard = () => {
                     onReset={handleReset}
                 />
                 <SummaryCards isFiltered={isFiltered} data={mockSummaryData}/>
-                <MapView />
+                <div className="dashboard-grid">
+                    <MapView />
+                    <Top10Chart />
+                </div>
+                <HolidayCompareChart />
             </main>
         </div>
     );
