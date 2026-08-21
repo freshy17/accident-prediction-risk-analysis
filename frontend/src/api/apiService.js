@@ -8,15 +8,23 @@ export const getYearList = async () => {
     return response.data;
 };
 
+//ดึงชื่อจังหวัดทั้งหมด
+export const getProvinceList = async () => {
+    const response = await axios.get(`${BASE_URL}/provinces`);
+    return response.data
+};
+
 //ดึงข้อมูลสรุปการ์ด 4 ใบ
-export const getSummaryData = async (selectedYear, provinceCode) => {
-    const response = await axios.get(`${BASE_URL}/summaries`, {
-        params: {
-            year: selectedYear,
-            province_code: provinceCode
-        }
+export const getSummaryData = async (filters) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/summaries`, {
+        params: filters
     });
-    return response.data;
+    return response.data
+    } catch (error) {
+        console.error("Error in getSummaryData:", error);
+        throw error;
+    }
 };
 
 //ดึงพิกัดจุดเสี่ยงสำหรับทำแผนที่
@@ -33,6 +41,17 @@ export const getTop10 = async (selectedYear, provinceCode) => {
         params: {
             year: selectedYear,
             province_code: provinceCode
+        }
+    });
+    return response.data;
+};
+
+//ดึงข้อมูลเปรียบเทียบช่วงวันหยุด 
+export const getHolidayCompareData = async (filters) => {
+    const { selectedYear } = filters
+    const response = await axios.get(`${BASE_URL}/summaries/holiday-compare`, {
+        params: {
+            year: selectedYear,
         }
     });
     return response.data;

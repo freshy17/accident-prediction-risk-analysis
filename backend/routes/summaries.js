@@ -4,44 +4,136 @@ const db = require('../config/db');
 
 //GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
 router.get('/', async (req, res) => {
-    const { province_code, district_code, time_period, day_type, year } = req.query;
+    const { 
+        province_code, 
+        district_code, 
+        time_period, 
+        day_type, 
+        year,
+        province,
+        timeRange,
+        dayType
+    } = req.query;
 
     try {
-        let sql = 'SELECT * FROM summaries';
         let params = [];
         let conditions = [];
 
-        if (province_code) {
-            conditions.push('province_code = ?');
-            params.push(province_code);
+        const provVal = province || province_code;
+        const timeVal = timeRange || time_period;
+        const dayVal = dayType || day_type;
+
+        let numericProvCode = province_code || null;
+        if(provVal && provVal !== '' ) {
+            const [pRows] = await db.query(
+                `SELECT province_code FROM provinces WHERE province_name = ? OR province_code = ? LIMIT 1`,
+                [proVal, proVal] 
+            );
+            if(pRows.length > 0) {
+                numericProvCode = pRows[0].province_code;
+            }
         }
 
-        if (district_code) {
+        if (district_code && district_code !== '') {
             conditions.push('district_code = ?');
             params.push(district_code);
         }
 
-        if (time_period) {
-            conditions.push('time_period = ?');
-            params.push(time_period);
-        }
-
-        if (day_type) {
-            conditions.push('day_type = ?');
-            params.push(day_type);
-        }
-
-        if (year) {
+        if (year && year !== '') {
             conditions.push('year = ?');
             params.push(year);
         }
 
-        if (conditions.length > 0) {
-            sql += ' WHERE ' + conditions.join(' AND ');
+        const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+
+        const mainSql = `
+            SELECT  
+                COALESCE(SUM(total_accidents), 0) AS total_accidents,
+                COALESCE(SUM(total_deaths), 0) AS total_deaths,
+                COALESCE(SUM(total_injuries), 0) AS total_injuries
+            FROM summaries
+            ${whereClause}
+        `;
+
+        const peakTimeSql = `
+            SELECT time_period, SUM(total_accidents) AS total
+            FROM summaries
+            ${whereClause}
+            GROUP BY time_period
+            ORDER BY total DESC
+            LIMIT 1
+            `;
+
+        let riskConditions = [];
+        let riskParams = [];
+
+        if(numericProvCode) {
+            riskConditions.push('province_code = ?');
+            riskParams.push(numericProvCode);
+        }
+        if (timeVal) {
+            riskConditions.push('time_period = ?');
+            riskParams.push(timeVal);
+        }
+        if (dayVal) {
+            riskConditions.push('day_type = ?');
+            riskParams.push(dayVal);
+        }
+        if (year) {
+            riskConditions.push('year = ?');
+            riskParams.push(year);
         }
 
-        const [rows] = await db.query(sql, params);
-        res.json({ success: true, count: rows.length, data: rows });
+        const riskWhere = riskConditions.length > 0 ? ' WHERE ' + riskConditions.join(' AND ') : '';
+
+        const riskSql = `
+            SELECT 
+                AVG(risk_score) AS avg_risk_score,
+                risk_level
+            FROM risk_scores
+            ${riskWhere}
+            GROUP BY risk_level
+            ORDER BY avg_risk_score DESC
+            LIMIT 1
+        `;
+
+        const [mainRows] = await db.query(mainSql, [...params]);
+        const [peakRows] = await db.query(peakTimeSql, [...params]);
+        
+        let riskScore = 0;
+        let riskLevel = "-";
+
+        try {
+            const [riskRows] = await db.query(riskSql, [...riskParams]);
+            if(riskRows.length > 0 && riskRows[0].avg_risk_score !== null) {
+                riskScore = Number(riskRows[0].avg_risk_score).toFixed(1);
+                riskLevel = riskRows[0].risk_level || "-"
+            } else {
+                const totalAcc = Number(mainRows[0].total_accidents);
+                const totalDead = Number(mainRows[0].total_deaths);
+                if (totalAcc > 0) {
+                    const raw = (totalDead * 5) + totalAcc;
+                    riskScore = Math.min(Math.round(raw / 10), 100);
+                    riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
+                }
+            }
+        } catch (err) {
+            console.error("Error querying risk_scores table:", err.message)
+        }
+
+        const mostRiskyTime = timeVal || (peakRows.length > 0 ? peakRows[0].time_period : "-");
+       
+        res.json({ 
+            success: true, 
+            data: {
+                total_accidents: Number(mainRows[0].total_accidents),
+                total_deaths: Number(mainRows[0].total_deaths),
+                total_injuries: Number(mainRows[0].total_injuries),
+                most_risky_time: mostRiskyTime,
+                risk_score: riskScore,
+                risk_level: riskLevel
+            }
+        });
 
     } catch (error) {
         console.error('Error fetching summaries: ', error);
