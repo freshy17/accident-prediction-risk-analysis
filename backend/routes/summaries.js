@@ -2,11 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
-//GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
+// GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
 router.get('/', async (req, res) => {
     const { 
-        province_code, 
-        district_code, 
+        province_code,  
         time_period, 
         day_type, 
         year,
@@ -16,32 +15,60 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     try {
-        let params = [];
-        let conditions = [];
+        let params = []; //ค่าตัวแปรส่งไปแทน ?
+        let conditions = []; //เก็บคำสั่ง sql
 
-        const provVal = province || province_code;
-        const timeVal = timeRange || time_period;
-        const dayVal = dayType || day_type;
+        //ยุบตัวกรองที่หลายตัวแปรให้เหลือแค่ 1 
+        const provVal = (province || province_code || '').trim();
+        const timeVal = (timeRange || time_period || '').trim();
+        const dayVal = (dayType || day_type || '').trim();
+        const yearVal = (year || '').trim();
 
-        let numericProvCode = province_code || null;
+        //ถ้าจังหวัดส่งมาแบบตัวเลขแล้วก็ใช้เลย แต่ถ้าไม่ก็ null ก่อนแล้วทำการแปลงในขั้นตอนต่อไป
+        let numericProvCode = null;
         if(provVal && provVal !== '' ) {
-            const [pRows] = await db.query(
-                `SELECT province_code FROM provinces WHERE province_name = ? OR province_code = ? LIMIT 1`,
-                [proVal, proVal] 
-            );
-            if(pRows.length > 0) {
-                numericProvCode = pRows[0].province_code;
+            try {
+                const [pRows] = await db.query(
+                    `SELECT province_code FROM provinces
+                    WHERE id = ? OR province_code = ? OR pro_name_th = ? OR province_name = ? LIMIT 1`,
+                    [provVal, provVal, provVal, provVal] //เอาไปแทน ? ใน sql
+                );
+                if(pRows && pRows.length > 0) {
+                    numericProvCode = pRows[0].province_code;
+                } else {
+                    numericProvCode = provVal;
+                }
+            } catch (e) {
+                numericProvCode = provVal;
             }
         }
 
-        if (district_code && district_code !== '') {
-            conditions.push('district_code = ?');
-            params.push(district_code);
-        }
+        let mlDayType = dayVal;
+        if (dayVal === 'วันธรรมดา (จ.-ศ.)') mlDayType = 'normal';
+        if (dayVal === 'วันหยุดสุดสัปดาห์') mlDayType = 'weekend';
+        if (dayVal === 'เทศกาลปีใหม่') mlDayType = 'new_year';
+        if (dayVal === 'เทศกาลสงกรานต์') mlDayType = 'songkran';
 
-        if (year && year !== '') {
+
+        if (yearVal && yearVal !== '') {
             conditions.push('year = ?');
             params.push(year);
+        }
+
+        if (numericProvCode && numericProvCode !== '') {
+            conditions.push('province_code = ?');
+            params.push(numericProvCode);
+        }
+
+        if (timeVal && timeVal !== '' && timeVal !== 'ทั้งหมด' && timeVal !== 'all') {
+            const labelOnly = timeVal.split('(')[0].trim(); // ดึงข้อความหน้าวงเล็บ เช่น "เช้า"
+            conditions.push('(time_period LIKE ? OR time_period LIKE ? OR time_period = ? OR time_period = ?)');
+            params.push(`%${timeVal}%`, `%${labelOnly}%`, 'ไม่ระบุ', 'ไม่ระบุ ');
+        }
+
+        if (mlDayType && mlDayType !== '') {
+            conditions.push('day_type = ?');
+            params.push(mlDayType);
         }
 
         const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
@@ -64,22 +91,41 @@ router.get('/', async (req, res) => {
             LIMIT 1
             `;
 
-        let riskConditions = [];
-        let riskParams = [];
+        //ยิงคำสั่ง sql ไปในฐานข้อมูล แล้วเก็บผลลัพธ์ไว้ใน mainRows & peakRows
+        const [mainRows] = await db.query(mainSql, [...params]);
+        let peakRows = [];
+        try {
+            const [pRes] = await db.query(peakTimeSql, [...params]);
+            peakRows = pRes;
+        } catch (e) {}
+        
+        const totalAccidents = (mainRows && mainRows.length > 0) ? Number(mainRows[0].total_accidents || 0) : 0;
+        const totalDeaths = (mainRows && mainRows.length > 0) ? Number(mainRows[0].total_deaths || 0) : 0;
+        const totalInjuries = (mainRows && mainRows.length > 0) ? Number(mainRows[0].total_injuries || 0) : 0;
+
+        //ดีง risk Score
+        let riskScore = 0;
+        let riskLevel = "-";
+
+        let riskConditions = []; //เก็บข้อความ sql
+        let riskParams = []; //กล่องเก็บค่าตัวแปร
 
         if(numericProvCode) {
             riskConditions.push('province_code = ?');
             riskParams.push(numericProvCode);
         }
-        if (timeVal) {
-            riskConditions.push('time_period = ?');
-            riskParams.push(timeVal);
+
+        if (timeVal && timeVal !== '' && timeVal !== 'ทั้งหมด' && timeVal !== 'all') {
+            const labelOnly = timeVal.split('(')[0].trim();
+            riskConditions.push('(time_period LIKE ? OR time_period LIKE ? OR time_period = ? OR time_period = ?)');
+            riskParams.push(`%${timeVal}%`, `%${labelOnly}%`, 'ไม่ระบุ', 'ไม่ระบุ ');
         }
-        if (dayVal) {
+
+        if (mlDayType && mlDayType !== '') {
             riskConditions.push('day_type = ?');
-            riskParams.push(dayVal);
+            riskParams.push(mlDayType);
         }
-        if (year) {
+        if (yearVal && yearVal !== '') {
             riskConditions.push('year = ?');
             riskParams.push(year);
         }
@@ -97,38 +143,47 @@ router.get('/', async (req, res) => {
             LIMIT 1
         `;
 
-        const [mainRows] = await db.query(mainSql, [...params]);
-        const [peakRows] = await db.query(peakTimeSql, [...params]);
-        
-        let riskScore = 0;
-        let riskLevel = "-";
-
         try {
             const [riskRows] = await db.query(riskSql, [...riskParams]);
             if(riskRows.length > 0 && riskRows[0].avg_risk_score !== null) {
-                riskScore = Number(riskRows[0].avg_risk_score).toFixed(1);
-                riskLevel = riskRows[0].risk_level || "-"
+                const rawAvg = Number(riskRows[0].avg_risk_score);
+
+                const formattedAvg = Math.min(rawAvg, 100)
+
+                riskScore = Number(formattedAvg.toFixed(2));
+                // riskScore = Math.min(Math.round(rawAvg), 100);
+                riskLevel = riskRows[0].risk_level || (riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low');
             } else {
-                const totalAcc = Number(mainRows[0].total_accidents);
-                const totalDead = Number(mainRows[0].total_deaths);
-                if (totalAcc > 0) {
-                    const raw = (totalDead * 5) + totalAcc;
-                    riskScore = Math.min(Math.round(raw / 10), 100);
+                if (totalAccidents > 0) {
+                    const raw = (totalDeaths * 5) + totalAccidents;
+
+                    const formattedRaw = Math.min(raw, 100)
+                    
+                    riskScore = Number(formattedRaw.toFixed(2));
+                    // riskScore = Math.min(Math.round(raw / 10), 100);
                     riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
                 }
             }
         } catch (err) {
             console.error("Error querying risk_scores table:", err.message)
+            if (totalAccidents > 0) {
+                const raw = (totalDeaths * 5) + totalAccidents;
+
+                const formattedRaw = Math.min(raw, 100)
+
+                riskScore = Number(formattedRaw.toFixed(2));
+                // riskScore = Math.min(Math.round(raw / 10), 100);
+                riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
+    }
         }
 
-        const mostRiskyTime = timeVal || (peakRows.length > 0 ? peakRows[0].time_period : "-");
+        const mostRiskyTime = timeVal || (peakRows && peakRows.length > 0 ? peakRows[0].time_period : "-");
        
         res.json({ 
-            success: true, 
-            data: {
-                total_accidents: Number(mainRows[0].total_accidents),
-                total_deaths: Number(mainRows[0].total_deaths),
-                total_injuries: Number(mainRows[0].total_injuries),
+            success: true, data: {
+                total_accidents: totalAccidents,
+                total_deaths: totalDeaths,
+                total_injuries: totalInjuries,
                 most_risky_time: mostRiskyTime,
                 risk_score: riskScore,
                 risk_level: riskLevel
