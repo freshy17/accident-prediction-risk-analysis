@@ -43,13 +43,20 @@ router.get('/', async (req, res) => {
             }
         }
 
+        //แปลง dayVal ให้ตรงกับใน Database (normal_day, weekend, new_year, songkran)
         let mlDayType = dayVal;
-        if (dayVal === 'วันธรรมดา (จ.-ศ.)') mlDayType = 'normal';
-        if (dayVal === 'วันหยุดสุดสัปดาห์') mlDayType = 'weekend';
-        if (dayVal === 'เทศกาลปีใหม่') mlDayType = 'new_year';
-        if (dayVal === 'เทศกาลสงกรานต์') mlDayType = 'songkran';
 
+        if (dayVal.includes('ธรรมดา') || dayVal.includes('จ.-ศ.') || dayVal.includes('normal')) {
+            mlDayType = 'normal_day';
+        } else if (dayVal.includes('สุดสัปดาห์') || dayVal.includes('เสาร์') || dayVal.includes('weekend')) {
+            mlDayType = 'weekend';
+        } else if (dayVal.includes('ปีใหม่') || dayVal.includes('new_year')) {
+            mlDayType = 'new_year';
+        } else if (dayVal.includes('สงกรานต์') || dayVal.includes('songkran')) {
+            mlDayType = 'songkran';
+        }
 
+        //ถ้ามีการ filter ให้เพิ่มแต่ละ filter เข้าไปใน sql
         if (yearVal && yearVal !== '') {
             conditions.push('year = ?');
             params.push(year);
@@ -151,7 +158,7 @@ router.get('/', async (req, res) => {
                 const formattedAvg = Math.min(rawAvg, 100)
 
                 riskScore = Number(formattedAvg.toFixed(2));
-                // riskScore = Math.min(Math.round(rawAvg), 100);
+
                 riskLevel = riskRows[0].risk_level || (riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low');
             } else {
                 if (totalAccidents > 0) {
@@ -160,7 +167,7 @@ router.get('/', async (req, res) => {
                     const formattedRaw = Math.min(raw, 100)
                     
                     riskScore = Number(formattedRaw.toFixed(2));
-                    // riskScore = Math.min(Math.round(raw / 10), 100);
+                
                     riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
                 }
             }
@@ -172,7 +179,7 @@ router.get('/', async (req, res) => {
                 const formattedRaw = Math.min(raw, 100)
 
                 riskScore = Number(formattedRaw.toFixed(2));
-                // riskScore = Math.min(Math.round(raw / 10), 100);
+             
                 riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
     }
         }

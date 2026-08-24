@@ -234,6 +234,11 @@ html, body, #root {
   font-weight: 600;
 }
 
+.loading-text {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
 /* กรอบบังคับขนาดแผนที่ */
 .map-container-wrapper {
   height: 450px;
@@ -245,12 +250,16 @@ html, body, #root {
 /* เนื้อหาใน Pop-up */
 .popup-content {
   padding: 0.25rem;
+  min-width: 170px;
 }
 
 .popup-title {
   margin: 0 0 0.5rem 0;
   color: #0f172a;
   font-size: 0.95rem;
+  font-weight: 600;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.25rem;
 }
 
 .popup-details {
@@ -258,7 +267,38 @@ html, body, #root {
   color: #475569;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
+}
+
+.popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.popup-factor {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  margin-top: 0.25rem;
+  background-color: #f8fafc;
+  padding: 0.35rem;
+  border-radius: 0.25rem;
+}
+
+.factor-text {
+  color: #334155;
+  font-weight: 500;
+}
+
+.popup-warning {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #be123c;
+  background-color: #fff1f2;
+  padding: 0.25rem 0.4rem;
+  border-radius: 0.25rem;
 }
 
 /* Top10Chart */
