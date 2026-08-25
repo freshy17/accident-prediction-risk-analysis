@@ -50,15 +50,6 @@ const Dashboard = () => {
         fetchSummary();
     }, [filters]);
 
-    // const mockSummaryData = {
-    //     totalAccidents: isFiltered ? 1250 : 45200,
-    //     totalDeaths: isFiltered ? 42 : 1850,
-    //     totalInjuries: 32100,
-    //     mostRiskyTime: '18:00 - 21:00 น.',
-    //     riskScore: 82.5,
-    //     riskLevel: 'เสี่ยงสูงมาก'
-    // };
-
     const handleReset = () => {
         setFilters(initialFilters);
     };
@@ -78,7 +69,7 @@ const Dashboard = () => {
                     loading={loading}
                 />
                 <div className="dashboard-grid">
-                    <MapView />
+                    <MapView filters={filters} />
                     <Top10Chart />
                 </div>
                 <HolidayCompareChart />

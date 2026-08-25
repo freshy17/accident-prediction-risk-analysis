@@ -16,31 +16,25 @@ L.Icon.Default.mergeOptions({
     shadowUrl: markerShadow,
 });
 
-// Mock Data พิกัดจุดเสี่ยงสำหรับทดสอบ
-// const defaultMockAccidents = [
-//   { id: 1, lat: 13.7563, lng: 100.5018, location: 'ถนนสุขุมวิท กรุงเทพฯ', deaths: 2, injuries: 5, severity: 'high' },
-//   { id: 2, lat: 18.7883, lng: 98.9853, location: 'ถนนซุปเปอร์ไฮเวย์ เชียงใหม่', deaths: 0, injuries: 3, severity: 'medium' },
-//   { id: 3, lat: 7.8804, lng: 98.3923, location: 'ถนนเทพกระษัตรี ภูเก็ต', deaths: 1, injuries: 1, severity: 'high' },
-//   { id: 4, lat: 14.9707, lng: 102.0882, location: 'ถนนมิตรภาพ นครราชสีมา', deaths: 0, injuries: 2, severity: 'low' },
-// ];
-
 const THAILAND_CENTER = [13.736717, 100.523186];
 
-// Helper สั่งซูมแผนที่ไปยังจุดที่เลือก
-function MapFlyTo({ center, zoom }) {
+//สั่งซูมแผนที่ไปยังจุดที่เลือก
+function MapFlyTo({ lat, lng, zoom }) {
     const map = useMap();
+    
     useEffect(() => {
-        if (center) {
-            map.flyTo(center, zoom, { duration: 1.5});
+        if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+            map.flyTo([lat, lng], zoom, { duration: 1.2 });
         }
-    }, [center, zoom, map]);
+    }, [lat, lng, zoom, map]);
+
     return null;
 }
 
 function MapView({ filters }) {
    
     const [hotspots, setHotspots] = useState([]);
-    const [selectedPoint, setSelectedPoint] = useState(null);
+    // const [districts, setDistricts] = useState([]);
     const [mapCenter, setMapCenter] = useState(THAILAND_CENTER);
     const [mapZoom, setMapZoom] = useState(5);
     const [loading, setLoading] = useState(false);
@@ -53,34 +47,45 @@ function MapView({ filters }) {
         setLoading(true);
         try {
             const queryParams = new URLSearchParams(filters || {}).toString();
+
+            // const res = await fetch(`http://localhost:5000/api/districts-risk?${queryParams}`);
             const res = await fetch(`http://localhost:5000/api/hotspots?${queryParams}`);
             const data = await res.json();
 
-            if (data.success && data.data) {
+            if (data.success && data.data && data.data.length > 0) {
                 setHotspots(data.data);
 
-                //ซูมเข้าไปเมื่อกดเลือกจังหวัด
-                if (data.data.length > 0 && filters?.province_code && filters.province_code !== 'ทั้งหมด') {
+                const selectedProv = filters?.province_code || filters?.province;
+                const hasSelectedProvince = selectedProv && selectedProv !== '' && selectedProv !== 'ทั้งหมด';
+
+                // ซูมเข้าไปเมื่อกดเลือกจังหวัด
+                if (data.data.length > 0 && hasSelectedProvince) {
                     const firstPoint = data.data[0];
-                    if(firstPoint.lat && firstPoint.lng) {
-                        setMapCenter([parseFloat(firstPoint.lat), parseFloat(firstPoint.lng)]);
-                        setMapZoom(9);
-                    } 
-                } else {
-                        setMapCenter(THAILAND_CENTER);
-                        setMapZoom(5);
+                    
+                    // ดักจับ lat/lng latitude/longitude
+                    const targetLat = parseFloat(firstPoint.lat || firstPoint.latitude);
+                    const targetLng = parseFloat(firstPoint.lng || firstPoint.longitude);
+
+                    if(!isNaN(targetLat) && !isNaN(targetLng)) {
+                        setMapCenter([targetLat, targetLng]);
+                        setMapZoom(9); //ซูมระดับจังหวัด
                     }
-                }   
+                } else {
+                        // setDistricts([avgLat, avgLng]);
+                        setMapCenter(THAILAND_CENTER);
+                        setMapZoom(5); //ภาพรวมทั้งประเทศ
+                    }
+                }    
         } catch (error) {
             console.error("Error fetching map hotspots:", error);
         } finally {
             setLoading(false);
         }
     };
-
+    
     const getMarkerColor = (score, level) => {
-        if (level === 'high' || score >= 50) return '#dc2626';
-        if (level === 'medium' || score >= 20) return '#f97316';
+        if (level === 'high' || score >= 8) return '#dc2626';
+        if (level === 'medium' || score >= 3) return '#f97316';
         return '#eab308';
     }; 
 
@@ -104,11 +109,9 @@ function MapView({ filters }) {
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
 
-                    <MapFlyTo center={mapCenter} zoom={mapZoom} />
+                    <MapFlyTo lat={mapCenter[0]} lng={mapCenter[1]} zoom={mapZoom} />
 
                     {hotspots.map((item, idx) => {
-                        // if (!item.lat || !item.lng) return null;
-                        // const color = getMarkerColor(item.risk_score, item.risk_level);
 
                         // แปลงค่าให้เป็น Float เผื่อ API ส่งมาเป็น String
                         const lat = parseFloat(item.lat || item.latitude);
@@ -123,7 +126,6 @@ function MapView({ filters }) {
                         return (
                             <CircleMarker
                                 key={item.hotspot_id || idx} 
-                                // center={[parseFloat(item.lat), parseFloat(item.lng)]}
                                 center={[lat, lng]}
                                 radius={8}
                                 pathOptions={{
@@ -137,7 +139,7 @@ function MapView({ filters }) {
                                 <Popup>
                                     <div className="popup-content">
                                         <h4 className="popup-title">
-                                            อ.{item.district_name || '-'} จ.{item.province_name || '-'} 
+                                             จังหวัด{item.province_name || '-'} 
                                         </h4>
                                         <div className="popup-details">
                                             <div className="popup-row">
