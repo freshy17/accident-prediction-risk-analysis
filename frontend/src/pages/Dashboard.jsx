@@ -1,12 +1,17 @@
-import React, {useState, useEffect} from "react";
+import {useState, useEffect} from "react";
 import NavBar from "../components/Navbar";
 import FilterBar from "../components/FilterBar";
 import SummaryCards from "../components/SummaryCards";
 import MapView from "../components/MapView";
 import Top10Chart from "../components/Top10Chart";
 import HolidayCompareChart from "../components/HolidayCompareChart";
-import { getSummaryData } from "../api/apiService";
 
+import {
+    getSummaryData,
+    getHotspotPoints,
+    getTop10,
+    getHolidayCompareData
+} from "../api/apiService";
 
 const Dashboard = () => {
     
@@ -17,37 +22,52 @@ const Dashboard = () => {
         dayType: ''
     };
 
-    const [filters, setFilters] =  useState(initialFilters);
+    const [filters, setFilters] = useState(initialFilters);
+
+    //state เก็บข้อมูลแต่ละส่วน
     const [summaryData, setSummaryData] =  useState(null);
+    const [hotspots, setHotspots] =  useState([]);
+    const [top10Data, setTop10Data] =  useState([]);
+    const [holidayData, setHolidayData] =  useState([]);
     const [loading, setLoading] =  useState(false);
 
     const isFiltered = Boolean(filters.province || filters.timeRange || filters.dayType);
 
+    //ดึงข้อมูลใหม่ทุกครั้งที่ filters เปลี่ยน
     useEffect(() => {
-        const fetchSummary = async () => {
+        const fetchDashboardData = async () => {
             setLoading(true);
             try {
-                const response = await getSummaryData(filters);
-                console.log("Summary Response จาก Backend:", response);
+                //ดึงข้อมูล 4 ส่วนพร้อมกันเพื่อความเร็ว
+                const [summaryRes, HotspotRes, top10Res, holidayRes] = await Promise.all([
+                    getSummaryData(filters),
+                    getHotspotPoints(filters.year, filters.province),
+                    getTop10(filters.year, filters.province),
+                    getHolidayCompareData(filters.year, filters.province)
+                ]);
 
-                const resData = response?.data || response;
-
+                const resData = summaryRes?.data || summaryRes;
                 setSummaryData({
                     totalAccidents: resData.total_accidents || 0,
                     totalDeaths: resData.total_deaths || 0,
                     totalInjuries: resData.total_injuries || 0,
                     mostRiskyTime: resData.most_risky_time || "-",
-                    riskScore: resData.risk_score || 0,
-                    riskLevel: resData.risk_level || "-",
                 })
+
+                if (HotspotRes?.success) setHotspots(HotspotRes.data);
+
+                if (top10Res?.success) setTop10Data(top10Res.data);
+
+                if (holidayRes?.success) setHolidayData(holidayRes.data);
+
             } catch (error) {
-                console.error("Error fetching summary data:", error);
+                console.error("Error fetching dashboard data:", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchSummary();
+        fetchDashboardData();
     }, [filters]);
 
     const handleReset = () => {
@@ -69,10 +89,11 @@ const Dashboard = () => {
                     loading={loading}
                 />
                 <div className="dashboard-grid">
-                    <MapView filters={filters} />
-                    <Top10Chart />
+                    {/* ส่งข้อมูลลง Components เพื่อนำไปวาดหมุดและกราฟ */}
+                    <MapView filters={filters} data={hotspots} loading={loading} />
+                    <Top10Chart data={top10Data} loading={loading}/>
                 </div>
-                <HolidayCompareChart />
+                <HolidayCompareChart data={holidayData} loading={loading} />
             </main>
         </div>
     );

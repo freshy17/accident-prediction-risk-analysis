@@ -4,14 +4,24 @@ const BASE_URL = 'http://localhost:5000/api';
 
 //ดึงปีทั้งหมดที่มีมา
 export const getYearList = async () => {
-    const response = await axios.get(`${BASE_URL}/summaries/years`);
-    return response.data;
+    try {
+        const response = await axios.get(`${BASE_URL}/summaries/years`);
+        return response.data;
+    } catch (error) {
+        console.error("Error in getYearList:", error);
+        throw error;
+    }
 };
 
 //ดึงชื่อจังหวัดทั้งหมด
 export const getProvinceList = async () => {
-    const response = await axios.get(`${BASE_URL}/provinces`);
-    return response.data
+    try {
+        const response = await axios.get(`${BASE_URL}/provinces`);
+        return response.data;
+    } catch (error) {
+        console.error("Error in getProvinceList:", error);
+        throw error;
+    }
 };
 
 //ดึงข้อมูลสรุปการ์ด 4 ใบ
@@ -28,31 +38,62 @@ export const getSummaryData = async (filters) => {
 };
 
 //ดึงพิกัดจุดเสี่ยงสำหรับทำแผนที่
-export const getHotspotPoints = async (selectedYear) => {
-    const response = await axios.get(`${BASE_URL}/hotspots`, {
-        params: { year: selectedYear }
-    });
-    return response.data;
+export const getHotspotPoints = async (selectedYear, provinceCode) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/hotspots`, {
+            params: { 
+                year: selectedYear,
+                province_code: provinceCode 
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in getHotspotPoints:", error);
+        throw error;
+    }
 };
 
-//ดึงข้อมูล 10 อันดับพื้นที่เสี่ยง
+//ดึงข้อมูล Top 10 อันดับพื้นที่เสี่ยง (รองรับทั้งระดับประเทศ และ ระดับอำเภอเมื่อกดเลือกจังหวัด)
 export const getTop10 = async (selectedYear, provinceCode) => {
-    const response = await axios.get(`${BASE_URL}/summaries/top10`, {
-        params: {
-            year: selectedYear,
-            province_code: provinceCode
-        }
-    });
-    return response.data;
+    try {
+        const response = await axios.get(`${BASE_URL}/summaries/top10`, {
+            params: {
+                year: selectedYear,
+                province_code: provinceCode
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in getTop10:", error);
+        throw error;
+    }
 };
 
-//ดึงข้อมูลเปรียบเทียบช่วงวันหยุด 
-export const getHolidayCompareData = async (filters) => {
-    const { selectedYear } = filters
-    const response = await axios.get(`${BASE_URL}/summaries/holiday-compare`, {
-        params: {
-            year: selectedYear,
-        }
-    });
-    return response.data;
+//ดึงข้อมูลเปรียบเทียบช่วงวันหยุด (รองรับ filter ตามปี และจังหวัด)
+export const getHolidayCompareData = async (selectedYear, provinceCode) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/summaries/holiday-compare`, {
+            params: {
+                year: selectedYear,
+                province_code: provinceCode
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in getHolidayCompareData:", error);
+        throw error;
+    }
+};
+
+//ดึงผลการพยากรณ์ความเสี่ยง (สำหรับหน้า Risk Prediction และ SHAP)
+export const getRiskPrediction = async (filters) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/predict`, {
+            params: filters
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in getRiskPrediction:", error);
+        throw error
+    }
 };

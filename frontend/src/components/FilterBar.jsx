@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from "react";
+import { useState, useEffect} from "react";
 import { RotateCcw } from "lucide-react";
 import { getYearList, getProvinceList } from "../api/apiService";
 
@@ -30,10 +30,23 @@ useEffect(() => {
 
 const handleChange = (e) => {
     const { name, value } = e.target;
-    setFilters((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    if (name === "province") {
+        const selectedProv = provinceList.find(
+            (p) => String(p.province_code) === String(value)
+        );
+        
+        setFilters((prev) => ({
+            ...prev,
+            province: value,
+            province_name: selectedProv ? selectedProv.pro_name_th : ""
+        }));
+    } else {
+        setFilters((prev) => ({
+            ...prev,
+            [name]: value
+        }));
+    }
 };
 
   return (
