@@ -18,13 +18,13 @@ router.get('/', async (req, res) => {
         let params = []; //ค่าตัวแปรส่งไปแทน ?
         let conditions = []; //เก็บคำสั่ง sql
 
-        //ยุบตัวกรองที่หลายตัวแปรให้เหลือแค่ 1 
+        //ยุบตัวกรองที่หลายตัวแปรให้เหลือแค่ 1 ตัว
         const provVal = (province || province_code || '').trim();
         const timeVal = (timeRange || time_period || '').trim();
         const dayVal = (dayType || day_type || '').trim();
         const yearVal = (year || '').trim();
 
-        //ถ้าจังหวัดส่งมาแบบตัวเลขแล้วก็ใช้เลย แต่ถ้าไม่ก็ null ก่อนแล้วทำการแปลงในขั้นตอนต่อไป
+        //แปลงจังหวัด
         let numericProvCode = null;
         if(provVal && provVal !== '' ) {
             try {
@@ -56,30 +56,32 @@ router.get('/', async (req, res) => {
             mlDayType = 'songkran';
         }
 
+        //สร้าง WHERE Claude ตาม Filter ที่เลือก
         //ถ้ามีการ filter ให้เพิ่มแต่ละ filter เข้าไปใน sql
-        if (yearVal && yearVal !== '') {
+        if (yearVal && yearVal !== '' && yearVal !== 'ทั้งหมด' && yearVal !== 'all') {
             conditions.push('year = ?');
-            params.push(year);
+            params.push(yearVal);
         }
 
-        if (numericProvCode && numericProvCode !== '') {
+        if (numericProvCode && numericProvCode !== '' && numericProvCode !== 'ทั้งหมด' && numericProvCode !== 'all') {
             conditions.push('province_code = ?');
             params.push(numericProvCode);
         }
 
-        if (timeVal && timeVal !== '' && timeVal !== 'ทั้งหมด' && timeVal !== 'all') {
-            const labelOnly = timeVal.split('(')[0].trim(); // ดึงข้อความหน้าวงเล็บ เช่น "เช้า"
-            conditions.push('(time_period LIKE ? OR time_period LIKE ? OR time_period = ? OR time_period = ?)');
-            params.push(`%${timeVal}%`, `%${labelOnly}%`, 'ไม่ระบุ', 'ไม่ระบุ ');
+       if (timeVal && timeVal !== '' && timeVal !== 'ทั้งหมด' && timeVal !== 'all') {
+            const labelOnly = timeVal.split('(')[0].trim();
+            conditions.push('(time_period LIKE ? OR time_period LIKE ?)');
+            params.push(`%${timeVal}%`, `%${labelOnly}%`);
         }
 
-        if (mlDayType && mlDayType !== '') {
+        if (mlDayType && mlDayType !== '' && mlDayType !== 'ทั้งหมด' && mlDayType !== 'all') {
             conditions.push('day_type = ?');
             params.push(mlDayType);
         }
 
         const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
+        //ดึงข้อมูลผลรวมจำนวนอุบัติเหตุ, ผู้เสียชีวิต, ผู้บาดเจ็บ ทัังหมด
         const mainSql = `
             SELECT  
                 COALESCE(SUM(total_accidents), 0) AS total_accidents,
@@ -89,6 +91,7 @@ router.get('/', async (req, res) => {
             ${whereClause}
         `;
 
+        //ดึงข้อมูลช่วงเวลาที่เสี่ยงที่สุด
         const peakTimeSql = `
             SELECT time_period, SUM(total_accidents) AS total
             FROM summaries
@@ -110,90 +113,17 @@ router.get('/', async (req, res) => {
         const totalDeaths = (mainRows && mainRows.length > 0) ? Number(mainRows[0].total_deaths || 0) : 0;
         const totalInjuries = (mainRows && mainRows.length > 0) ? Number(mainRows[0].total_injuries || 0) : 0;
 
-        //ดีง risk Score
-        let riskScore = 0;
-        let riskLevel = "-";
+        //กำหนดคำตอบของช่วงเวลาที่เสี่ยงที่สุด
+        const mostRiskyTime = (timeVal && timeVal !== 'ทั้งหมด' && timeVal !== 'all') 
+            ? timeVal 
+            : (peakRows && peakRows.length > 0 ? peakRows[0].time_period : "-");
 
-        let riskConditions = []; //เก็บข้อความ sql
-        let riskParams = []; //กล่องเก็บค่าตัวแปร
-
-        if(numericProvCode) {
-            riskConditions.push('province_code = ?');
-            riskParams.push(numericProvCode);
-        }
-
-        if (timeVal && timeVal !== '' && timeVal !== 'ทั้งหมด' && timeVal !== 'all') {
-            const labelOnly = timeVal.split('(')[0].trim();
-            riskConditions.push('(time_period LIKE ? OR time_period LIKE ? OR time_period = ? OR time_period = ?)');
-            riskParams.push(`%${timeVal}%`, `%${labelOnly}%`, 'ไม่ระบุ', 'ไม่ระบุ ');
-        }
-
-        if (mlDayType && mlDayType !== '') {
-            riskConditions.push('day_type = ?');
-            riskParams.push(mlDayType);
-        }
-        if (yearVal && yearVal !== '') {
-            riskConditions.push('year = ?');
-            riskParams.push(year);
-        }
-
-        const riskWhere = riskConditions.length > 0 ? ' WHERE ' + riskConditions.join(' AND ') : '';
-
-        const riskSql = `
-            SELECT 
-                AVG(risk_score) AS avg_risk_score,
-                risk_level
-            FROM risk_scores
-            ${riskWhere}
-            GROUP BY risk_level
-            ORDER BY avg_risk_score DESC
-            LIMIT 1
-        `;
-
-        try {
-            const [riskRows] = await db.query(riskSql, [...riskParams]);
-            if(riskRows.length > 0 && riskRows[0].avg_risk_score !== null) {
-                const rawAvg = Number(riskRows[0].avg_risk_score);
-
-                const formattedAvg = Math.min(rawAvg, 100)
-
-                riskScore = Number(formattedAvg.toFixed(2));
-
-                riskLevel = riskRows[0].risk_level || (riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low');
-            } else {
-                if (totalAccidents > 0) {
-                    const raw = (totalDeaths * 5) + totalAccidents;
-
-                    const formattedRaw = Math.min(raw, 100)
-                    
-                    riskScore = Number(formattedRaw.toFixed(2));
-                
-                    riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
-                }
-            }
-        } catch (err) {
-            console.error("Error querying risk_scores table:", err.message)
-            if (totalAccidents > 0) {
-                const raw = (totalDeaths * 5) + totalAccidents;
-
-                const formattedRaw = Math.min(raw, 100)
-
-                riskScore = Number(formattedRaw.toFixed(2));
-             
-                riskLevel = riskScore >= 50 ? 'high' : riskScore >= 20 ? 'medium' : 'low';
-    }
-        }
-
-        const mostRiskyTime = timeVal || (peakRows && peakRows.length > 0 ? peakRows[0].time_period : "-");
-       
         res.json({ 
             success: true, data: {
                 total_accidents: totalAccidents,
                 total_deaths: totalDeaths,
                 total_injuries: totalInjuries,
                 most_risky_time: mostRiskyTime,
-                risk_score: riskScore,
-                risk_level: riskLevel
             }
         });
 
@@ -205,7 +135,8 @@ router.get('/', async (req, res) => {
 
 //GET: /api/summaries/top10 (Top 10 กราฟแท่ง)
 router.get('/top10', async (req, res) => {
-    const { province_code, year, time_period, day_type} = req.query;
+    const { year } = req.query;
+    const province_code = req.query.province_code || req.query.province;
 
     try {
         let sql = '';
@@ -235,23 +166,13 @@ router.get('/top10', async (req, res) => {
             params.push(year);
         }
 
-        if (time_period) {
-            conditions.push('s.time_period = ?');
-            params.push(time_period);
-        }
-
-        if (day_type) {
-            conditions.push('s.day_type = ?');
-            params.push(day_type);
-        }
-
         if (conditions.length > 0) {
             sql += ' WHERE ' + conditions.join(' AND ');
         }
 
         sql += province_code
-            ? 'GROUP BY s.district_code ORDER BY total DESC LIMIT 10'
-            : 'GROUP BY s.province_code ORDER BY total DESC LIMIT 10';
+            ? ' GROUP BY s.district_code, d.dis_name_th ORDER BY total DESC LIMIT 10'
+            : ' GROUP BY s.province_code, p.pro_name_th ORDER BY total DESC LIMIT 10';
 
         const [rows] = await db.query(sql, params);
         res.json({ success: true, data: rows});
@@ -264,28 +185,48 @@ router.get('/top10', async (req, res) => {
 
 //GET: /api/summaries/compare (กราฟเปรียบเทียบ ปกติ & หยุดปีใหม่ & สงกรานต์)
 router.get('/compare', async (req, res) => {
-    const { province_code, year } = req.query;
+    const { year } = req.query;
+    const province_code = req.query.province_code || req.query.province;
 
     try {
-        let sql = `
-            SELECT
-                day_type,
-                SUM(total_accidents) AS total_accidents,
-                SUM(total_deaths) AS total_deaths,
-                SUM(totalinjuries) AS total_injuries
-            FROM summaries
-        `;
-
+        let sql = '';
         let params = [];
         let conditions = [];
 
         if (province_code) {
-            conditions.push('province_code = ?');
+            //เลือกจังหวัด
+            sql = `
+                SELECT
+                    d.dis_name_th AS name,
+                    SUM(CASE WHEN s.day_type IN ('normal_day', 'weekend') THEN s.total_accidents ELSE 0 END) AS normal,
+                    SUM(CASE WHEN s.day_type = 'new_year' THEN s.total_accidents ELSE 0 END) AS newYear,
+                    SUM(CASE WHEN s.day_type = 'songkran' THEN s.total_accidents ELSE 0 END) AS songkran
+                FROM summaries s
+                JOIN districts d ON s.district_code = d.district_code
+            `;
+            conditions.push('s.province_code = ?');
             params.push(province_code);
+        } else {
+            //ไม่ได้เลือกจังหวัด
+            sql = `
+                SELECT
+                    CASE 
+                        WHEN CAST(s.province_code AS UNSIGNED) IN (10, 11, 12, 13, 14, 73, 74) THEN 'กทม. และปริมณฑล'
+                        WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 50 AND 58 
+                          OR CAST(s.province_code AS UNSIGNED) BETWEEN 63 AND 67 THEN 'ภาคเหนือ'
+                        WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 30 AND 49 THEN 'ภาคตะวันออกเฉียงเหนือ'
+                        WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 80 AND 96 THEN 'ภาคใต้'
+                        ELSE 'ภาคกลาง'
+                    END AS name,
+                    SUM(CASE WHEN s.day_type IN ('normal_day', 'weekend') THEN s.total_accidents ELSE 0 END) AS normal,
+                    SUM(CASE WHEN s.day_type = 'new_year' THEN s.total_accidents ELSE 0 END) AS newYear,
+                    SUM(CASE WHEN s.day_type = 'songkran' THEN s.total_accidents ELSE 0 END) AS songkran
+                FROM summaries s
+            `;
         }
 
         if (year) {
-            conditions.push('year = ?');
+            conditions.push('s.year = ?');
             params.push(year);
         }
 
@@ -293,7 +234,9 @@ router.get('/compare', async (req, res) => {
             sql += ' WHERE ' + conditions.join(' AND ');
         }
 
-        sql += ' GROUP BY day_type';
+        sql += province_code 
+            ? ' GROUP BY s.district_code, d.dis_name_th' 
+            : ' GROUP BY name';
 
         const [rows] = await db.query(sql, params);
         res.json({ success: true, data: rows });
@@ -318,3 +261,4 @@ router.get('/years', async (req, res) => {
 });
 
 module.exports = router;
+

@@ -17,6 +17,7 @@ const accidentRoutes = require('./routes/accidents');
 const risk_scoresRoutes = require('./routes/risk_scores');
 const hotspotsRoutes = require('./routes/hotspots');
 const summariesRoutes = require('./routes/summaries');
+const filterRoutes = require('./routes/filters_riskPrediction');
 
 //api ทดสอบว่า server ทำงานได้ปกติไหม
 app.get('/', (req, res) => {
@@ -29,6 +30,7 @@ app.use('/api/accidents', accidentRoutes);
 app.use('/api/risk_scores', risk_scoresRoutes);
 app.use('/api/hotspots', hotspotsRoutes);
 app.use('/api/summaries', summariesRoutes);
+app.use('/api/filters_riskPrediction', filterRoutes);
 
 //สั่งให้ server ทำงาน
 app.listen(PORT, () => {

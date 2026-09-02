@@ -72,7 +72,7 @@ export const getTop10 = async (selectedYear, provinceCode) => {
 //ดึงข้อมูลเปรียบเทียบช่วงวันหยุด (รองรับ filter ตามปี และจังหวัด)
 export const getHolidayCompareData = async (selectedYear, provinceCode) => {
     try {
-        const response = await axios.get(`${BASE_URL}/summaries/holiday-compare`, {
+        const response = await axios.get(`${BASE_URL}/summaries/compare`, {
             params: {
                 year: selectedYear,
                 province_code: provinceCode
@@ -95,5 +95,30 @@ export const getRiskPrediction = async (filters) => {
     } catch (error) {
         console.error("Error in getRiskPrediction:", error);
         throw error
+    }
+};
+
+//ดึงข้อมูลสำหรับ filter ใน Risk Prediction
+export const getFilterOptions = async () => {
+    try {
+        const response = await axios.get(`${BASE_URL}/filters_riskPrediction/filter-options`);
+        return response.data;
+    } catch (error) {
+        console.error("Error in getFilterOptions:", error);
+        throw error;
+    }
+};
+
+//ดึงข้อมูลอำเภอตามที่เลือกจังหวัด ใน Risk Prediction
+export const getDistrictsByProvinceCode = async (provinceCode) => {
+    if (!provinceCode) return [];
+    try {
+        const response = await axios.get(`${BASE_URL}/districts`, {
+            params: { province_code: provinceCode }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error in getDistrictsByProvinceCode:", error);
+        throw error;
     }
 };

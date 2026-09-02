@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
         }
 
         const [rows] = await db.query(sql, params);
-        res.json({success: true, count: rows.length, data: rows});
+        res.json(rows);
     } catch (error) {
         console.error('Error fetching districts: ', error);
         res.status(500).json({success: false, message: 'Database query error'});

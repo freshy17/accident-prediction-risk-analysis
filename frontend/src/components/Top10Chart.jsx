@@ -1,4 +1,4 @@
-import React from "react";
+import { useState, useEffect} from "react";
 import {
     BarChart,
     Bar,
@@ -7,11 +7,11 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Cell
 } from 'recharts';
 import { BarChart3 } from "lucide-react";
+import { getTop10 } from "../api/apiService";
 
-//Mock Data 10 อันดับจุดเสี่ยง/จังหวัด
+//Mock Data สำรอง (จะทำงานทันทีหาก API ไม่พร้อมส่งข้อมูล)
 const defaultMockTop10 = [
     { name: 'กรุงเทพ', count: 145 },
     { name: 'เชียงใหม่', count: 98 },
@@ -31,18 +31,84 @@ const BAR_COLORS = [
     '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6'
 ];
 
-function Top10Chart({ data = defaultMockTop10 }) {
+const CustomBar = (props) => {
+    const { fill, x, y, width, height, index } = props;
+    const barColor = BAR_COLORS[index % BAR_COLORS.length];
+
+    return (
+        <rect
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            fill={barColor}
+            rx={6} // โค้งมนฝั่งขวา
+            ry={6}
+        />
+    );
+};
+
+function Top10Chart({ filters }) {
+    const [chartData, setChartData] = useState(defaultMockTop10);
+    const [loading, setLoading] = useState(false);
+
+    //ตรวจสอบสถานะของการเลือกจังหวัด
+    const hasSelectedProvince = Boolean(filters?.province);
+    const provinceName = filters?.province_name || "";
+
+    const yearText = filters?.year ? ` (ปี ${filters.year})` : '';
+
+    const title = hasSelectedProvince
+        ? `Top 10 อำเภอที่เกิดอุบัติเหตุสูงสุดในจังหวัด${provinceName} ${yearText}`
+        : `Top 10 จังหวัดที่เกิดอุบัติเหตุสูงสุด${yearText}`;
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                //เรียกใช้ API 
+                const response = await getTop10(filters.year, filters.province);
+                console.log("Data from Backend Top10:", response);
+
+                const list = response?.data?.data || response?.data || response || [];
+                if (Array.isArray(list) && list.length > 0 ) {
+                    const formattedData = list.map(item => ({
+                        name: item.name || 'ไม่ระบุ',
+                        count: Number(item.total || 0) //แปลง string ให้เป็น Number
+                    })) ;
+                    setChartData(formattedData);
+                } else {
+                    //เลือกจังหวัดแล้วแต่ยังไม่มีข้อมูลที่ส่งมาจาก Backend ให้คืนค่าเป็นอาร์เรย์ว่าง
+                    setChartData(hasSelectedProvince ? [] : defaultMockTop10);
+                }
+            } catch (error) {
+                console.error("Error fetching Top10 Data:", error);
+                setChartData(hasSelectedProvince ? [] : defaultMockTop10);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [filters.year, filters.province])
+
     return (
         <div className="chart-card">
             <div className="chart-header">
                 <BarChart3 size={20} color="#dc2626"/>
-                <h3>Top 10 จังหวัดที่เกิดอุบัติเหตุสูงสุด</h3>
+                <h3>{title}</h3>
+                {loading && <span className="loading-text">(กำลังโหลด...)</span>}
             </div>
 
-            <div className="chart-container-wrapper">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="chart-container-wrapper" style={{ height: '320px', width: '100% '}}>
+                {chartData.length === 0 && !loading ? (
+                    <div className="no-data" style={{ textAlign: 'center', padding: '50px 0', color: '#64748b' }}>
+                        ไม่พบข้อมูลอุบัติเหตุในช่วงเวลาที่เลือก
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                        data={data}
+                        data={chartData}
                         layout="vertical"
                         margin={{ top: 5, right: 30, left: 40, bottom: 5}}
                     >
@@ -52,23 +118,23 @@ function Top10Chart({ data = defaultMockTop10 }) {
                             type="category"
                             dataKey="name"
                             stroke="#334155"
-                            fontSize={13}
+                            fontSize={12}
                             tickLine={false}
                             width={80}
-                        >
-                        </YAxis>
+                        />
                         <Tooltip
                             formatter={(value) => [`${value} ครั้ง`, 'จำนวนอุบัติเหตุ']}
                             contentStyle={{ background: '#1e293b', borderRadius: '0.5rem', color: '#fff', border: 'none'}}
                             itemStyle={{ color: '#f8fafc'}}
                         />
-                        <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={20}>
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                            ))} 
-                        </Bar>
+                        <Bar
+                            dataKey="count"
+                            barSize={18}
+                            shape={<CustomBar />}
+                        />
                     </BarChart>
                 </ResponsiveContainer>
+                )} 
             </div>
         </div>
     );
