@@ -31,6 +31,7 @@ app.use('/api/risk_scores', risk_scoresRoutes);
 app.use('/api/hotspots', hotspotsRoutes);
 app.use('/api/summaries', summariesRoutes);
 app.use('/api/filters_riskPrediction', filterRoutes);
+app.use('/api/predict', require('./routes/predict'));
 
 //สั่งให้ server ทำงาน
 app.listen(PORT, () => {

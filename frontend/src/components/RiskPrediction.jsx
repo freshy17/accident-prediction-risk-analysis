@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getFilterOptions, getDistrictsByProvinceCode } from "../api/apiService";
+import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction } from "../api/apiService";
 
 const DAY_TYPE_MAP = {
   'normal_day': 'วันธรรมดา (จ.-ศ.)',
@@ -18,8 +18,8 @@ function RiskPrediction() {
 
     const [districts, setDistricts] = useState([]);
     const [loadingDistricts, setLoadingDistricts] = useState(false);
-
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     
     const [formData, setFormData] = useState({
         province_code: '',
@@ -29,7 +29,10 @@ function RiskPrediction() {
         weather: ''
     });
 
-    //โหลดตัวเลือกหลักทั้งหมดเมื่อหน้าเว็บเริ่มทำงาน
+    // State เก็บผลลัพธ์จริงจาก API 
+    const [result, setResult] = useState(null);
+
+    //โหลดตัวเลือกทั้งหมดเมื่อหน้าเว็บเริ่มทำงาน
     useEffect(() => {
         const fetchInitialOptions = async () => {
             try {
@@ -87,26 +90,59 @@ function RiskPrediction() {
         fetchDistricts();
     }, [formData.province_code])
 
-    const [result, setResult] = useState({
-        score: 78,
-        level: 'High',
-        shapeValues: [
-            { label: 'ช่วงเทศกาลสงกราต์', value: 28, type: 'positive'},
-            { label: 'ช่วงเวลาดึก', value: 18, type: 'positive' },
-            { label: 'ถนนสายหลัก (4 เลน)', value: 9, type: 'positive' },
-            { label: 'สภาพอากาศแห้ง/ปกติ', value: -5, type: 'negative' },
-            { label: 'มีไฟส่องสว่างชัดเจน', value: -3, type: 'negative' },
-        ],
-        recommendation: 'ปัจจัยหลักที่ทำให้ความเสี่ยงสูงคือช่วงเวลาเทศกาลร่วมกับเวลาวิกลกาล ควรตั้งด่านตรวจความเร็วและกวดขันวินัยจราจรอย่างเข้มงวด',
-    });
-
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    //ฟังก์ชันยิง API พยากรณ์ความเสี่ยง
     const handlePredict = async () => {
+        if (!formData.district_code || !formData.timeRange || !formData.dayType || !formData.weather) {
+            alert("กรุณากรอกข้อมูลเงื่อนไขให้ครบถ้วนก่อนทำการพยากรณ์");
+            return;
+        }
         setLoading(true);
-        setTimeout(() => setLoading(false), 500);
+        setError("");
+        // setTimeout(() => setLoading(false), 500);
+
+        try {
+            const data = await getRiskPrediction({
+                district_code: formData.district_code,
+                timeRange: formData.timeRange,
+                dayType: formData.dayType,
+                weather: formData.weather
+            })
+
+            if (data.success) {
+                //แปลง shap_values จาก API ให้เข้ากับ UI 
+                const formattedShap = data.shap_values.map(item => ({
+                    label: item.feature,
+                    value: item.value,
+                    type: item.value >= 0 ? 'positive' : 'negative'
+                }));
+
+                //สร้าง Auto Recommendation จากค่า Risk Score
+                let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจร";
+                if (data.risk_level === 'High') {
+                    recText = "ปัจจัยหลักส่งผลให้ความเสี่ยงสูงมาก ควรเพิ่มความระมัดระวังในการเดินทาง ตั้งด่านกวดขันวินัยจราจร และตรวจเช็คสภาพถนน/ความเร็วอย่างเข้มงวด";
+                } else if (data.risk_level === 'Medium') {
+                    recText = "มีความเสี่ยงปานกลาง ควรระมัดระวังเป็นพิเศษในช่วงเวลาและสภาพอากาศที่เลือก";
+                }
+
+                setResult({
+                    score: data.risk_score,
+                    level: data.risk_level,
+                    shapeValues: formattedShap,
+                    recommendation: recText
+                });
+            } else {
+                setError(data.message || "เกิดข้อผิดพลาดในการพยากรณ์");
+            }
+        } catch (error) {
+            console.error("Predict failed:", error);
+            setError("ไม่สามารถเชื่อมต่อระบบพยากรณ์ได้ กรุณาลองใหม่อีกครั้ง")
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -210,58 +246,73 @@ function RiskPrediction() {
                 </div>
 
                 <button onClick={handlePredict} disabled={loading} className="btn-predict">
-                    🔍 {loading ? 'กำลังประมวลผล...' : 'Risk Prediction'}
+                    🔍 {loading ? '(กำลังประมวลผล...)' : 'Risk Prediction'}
                 </button>
+
+                {error && <p style={{ color: 'red', marginTop: '10px', fontSize: '14px' }}>{error}</p>}
             </div>
 
                 {/* ฝั่งขวา แสดงผล */}
                 <div className="predict-result-wrapper">
-                    {/* Card 1: Risk Score */}
-                    <div className="risk-score-card">
-                        <h3 className="risk-score-title">ผลการพยากรณ์ความเสี่ยง</h3>
-                        <div className="score-display-group">
-                            <div>
-                                <span className="text-gray-600 text-sm">Risk Score : </span>
-                                <span className="score-text-big">{result.score}/100</span>
-                            </div>
-                            <div>
-                                <span className="text-gray-600 text-sm">ระดับความเสี่ยง : </span>
-                                <span className="risk-level-high">{result.level}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Card 2: SHAP Value */}
-                    <div className="shap-card">
-                        <h3 className="shap-title">ปัจจัยที่มีผลต่อการพยากรณ์ (SHAP Values)</h3>
-                        <div className="shap-list">
-                            {result.shapeValues.map((item, idx) => (
-                                <div key={idx} className="shap-item">
-                                    <div className="shap-label-side">
-                                        <span className={item.type === 'positive' ? 'dot-positive' : 'dot-negative'} />
-                                        <span>{item.label}</span>
+                    {result ? (
+                        <>
+                         {/* Card 1: Risk Score */}
+                            <div className="risk-score-card">
+                                <h3 className="risk-score-title">ผลการพยากรณ์ความเสี่ยง</h3>
+                                <div className="score-display-group">
+                                    <div>
+                                        <span className="text-gray-600 text-sm">Risk Score : </span>
+                                        <span className="score-text-big">{result.score}/100</span>
                                     </div>
-                                    <div className="shap-bar-side">
-                                        <div className="bar-bg">
-                                            <div
-                                                className={item.type === 'positive' ? 'bar-fill-positive' : 'bar-fill-negative'}
-                                                style={{ width: `${Math.abs(item.value) * 3}%` }}
-                                            />
-                                        </div>
-                                        <span className={item.type === 'positive' ? 'shap-val-pos' : 'shap-val-neg'}>
-                                            {item.value > 0 ? `+${item.value}` : item.value}
-                                        </span>
+                                    <div>
+                                        <span className="text-gray-600 text-sm">ระดับความเสี่ยง : </span>
+                                            <span className={
+                                                result.level === 'High' ? 'risk-level-high' : 
+                                                result.level === 'Medium' ? 'risk-level-medium' : 'risk-level-low'
+                                            }>
+                                                {result.level}
+                                            </span>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
+                            </div>
 
-                    {/* Card 3: Recommendation */}
-                    <div className="recommend-card">
-                        <h3 className="recommend-title">ข้อเสนอแนะ</h3>
-                        <p className="recommend-text">{result.recommendation}</p>
+                            {/* Card 2: SHAP Value */}
+                            <div className="shap-card">
+                                <h3 className="shap-title">ปัจจัยที่มีผลต่อการพยากรณ์ (SHAP Values)</h3>
+                                <div className="shap-list">
+                                    {result.shapeValues.map((item, idx) => (
+                                        <div key={idx} className="shap-item">
+                                            <div className="shap-label-side">
+                                                <span className={item.type === 'positive' ? 'dot-positive' : 'dot-negative'} />
+                                                <span>{item.label}</span>
+                                            </div>
+                                            <div className="shap-bar-side">
+                                                <div className="bar-bg">
+                                                        <div
+                                                            className={item.type === 'positive' ? 'bar-fill-positive' : 'bar-fill-negative'}
+                                                            style={{ width: `${Math.min(Math.abs(item.value) * 5, 100)}%` }}
+                                                        />
+                                                    </div>
+                                                <span className={item.type === 'positive' ? 'shap-val-pos' : 'shap-val-neg'}>
+                                                    {item.value > 0 ? `+${item.value}` : item.value}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Card 3: Recommendation */}
+                            <div className="recommend-card">
+                                <h3 className="recommend-title">ข้อเสนอแนะ</h3>
+                                <p className="recommend-text">{result.recommendation}</p>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="risk-score-card" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                        <h3>👈 เลือกเงื่อนไขปัจจัยทางด้านซ้ายแล้วกด "Risk Prediction" เพื่อประเมินความเสี่ยง</h3>
                     </div>
+                    )} 
                 </div>
         </div>
     );

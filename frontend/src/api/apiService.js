@@ -85,16 +85,16 @@ export const getHolidayCompareData = async (selectedYear, provinceCode) => {
     }
 };
 
-//ดึงผลการพยากรณ์ความเสี่ยง (สำหรับหน้า Risk Prediction และ SHAP)
-export const getRiskPrediction = async (filters) => {
+//ดึงผลการพยากรณ์ความเสี่ยง (สำหรับหน้า Risk Prediction และ SHAP) 
+//POST เพื่อส่งข้อมูลไปคำนวณที่ Python
+export const getRiskPrediction = async (predictionData) => {
+    // predictionData รูปแบบ: { district_code, timeRange, dayType, weather }
     try {
-        const response = await axios.get(`${BASE_URL}/predict`, {
-            params: filters
-        });
+        const response = await axios.post(`${BASE_URL}/predict`, predictionData);
         return response.data;
     } catch (error) {
         console.error("Error in getRiskPrediction:", error);
-        throw error
+        throw error;
     }
 };
 
