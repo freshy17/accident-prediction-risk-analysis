@@ -66,7 +66,7 @@ def predict():
             {"feature": raw_day_type, "value": round(float(shap_vals.values[0][4]), 2)},
         ]
 
-        risk_level = "High" if score >= 70 else ("Medium" if score >= 40 else "Low")
+        risk_level = "High" if score >= 60 else ("Medium" if score >= 30 else "Low")
 
         return jsonify({
             "success": True,
