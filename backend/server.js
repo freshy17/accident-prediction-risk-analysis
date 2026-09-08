@@ -18,6 +18,7 @@ const risk_scoresRoutes = require('./routes/risk_scores');
 const hotspotsRoutes = require('./routes/hotspots');
 const summariesRoutes = require('./routes/summaries');
 const filterRoutes = require('./routes/filters_riskPrediction');
+const authRoutes = require('./routes/auth');
 
 //api ทดสอบว่า server ทำงานได้ปกติไหม
 app.get('/', (req, res) => {
@@ -32,6 +33,7 @@ app.use('/api/hotspots', hotspotsRoutes);
 app.use('/api/summaries', summariesRoutes);
 app.use('/api/filters_riskPrediction', filterRoutes);
 app.use('/api/predict', require('./routes/predict'));
+app.use('/api/admin', authRoutes);
 
 //สั่งให้ server ทำงาน
 app.listen(PORT, () => {

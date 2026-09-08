@@ -1,6 +1,6 @@
-import { Activity } from "lucide-react";
+import { Activity, Settings } from "lucide-react";
 
-const NavBar = () => {
+const NavBar = ( { onAdminClick }) => {
     return (
         <nav className="navbar">
             <div className="navbar-brand">
@@ -15,6 +15,16 @@ const NavBar = () => {
                         (ทางหลวงแผ่นดิน / ทางหลวงชนบท / และทางพิเศษ)
                     </p>
                 </div>
+            </div>
+
+            <div className="nav-bar-actions">
+                <button
+                    onClick={onAdminClick}
+                    title="Admin Login"
+                    className="setting-btn"
+                >
+                    <Settings size={24} className="gear-icon" />
+                </button>
             </div>
         </nav>
     );

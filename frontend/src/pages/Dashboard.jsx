@@ -6,6 +6,7 @@ import MapView from "../components/MapView";
 import Top10Chart from "../components/Top10Chart";
 import HolidayCompareChart from "../components/HolidayCompareChart";
 import RiskPrediction from "../components/RiskPrediction";
+import AdminLogin from "../components/AdminLogin";
 
 import {
     getSummaryData,
@@ -18,6 +19,8 @@ import {
 const Dashboard = () => {
 
     const [activeTab, setActiveTab] = useState('dashboard');
+
+    const [isLoginOpen, setIsLoginOpen] = useState(false);
     
     const initialFilters = {
         year: '2025',
@@ -110,9 +113,14 @@ const Dashboard = () => {
         setFilters(initialFilters);
     };
 
+    const handleLoginSuccess = () => {
+        alert('เข้าสู่ระบบแอดมินสำเร็จ:)')
+    };
+
     return (
         <div>
-            <NavBar />
+            <NavBar onAdminClick={() => setIsLoginOpen(true)} />
+                
             <main className="dashboard-container">
                 {/* Tap Bar สลับ Dashboard กับ Risk Prediction */}
                 <div style={{ 
@@ -190,6 +198,12 @@ const Dashboard = () => {
                     <RiskPrediction />
                 )}
             </main>
+
+            <AdminLogin
+                isOpen={isLoginOpen}
+                onClose={() => setIsLoginOpen(false)}
+                onLoginSuccess={handleLoginSuccess}
+            />
         </div>
     );
 };
