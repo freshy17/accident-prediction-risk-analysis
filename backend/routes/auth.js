@@ -6,6 +6,25 @@ const db = require('../config/db');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
+//Middleware ตรวจสอบ Token แอดมิน
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ success: false, message: 'ไม่มี token ยืนยันตัวตน'});
+    }
+
+    //ถอดรหัส+ตรวจสอบความถูกต้อง
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if(err) {
+           return res.status(403).json({ success: false, message: 'Token ไม่ถูกต้องหรือหมดอายุ' });
+        }
+        req.user = user;
+        next(); //ผ่านแล้ว ไปทำฟังก์ชันต่อไปได้ก็คือ /add-data 
+    });
+};
+
 //API สำหรับ Admin Login
 router.post('/login', async(req, res) => {
     const { username, password } = req.body;
@@ -68,6 +87,24 @@ router.post('/register-admin', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Error in Server' });
+    }
+});
+
+//API สำหรับ เพิ่มข้อมูลหน้า AdminUpload
+router.post('/add-data', verifyToken, async (req, res) => {
+    const { title, description } = req.body;
+
+    try {
+        await db.query(
+            'INSERT INTO accidents (title, description) VALUES (?, ?)',
+            [title, description]
+        );
+
+        res.status(201).json({ success: true, message: 'เพิ่มข้อมูลไฟล์อุบัติเหตุสำเร็จ' });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Error in Server '});
     }
 });
 

@@ -7,6 +7,7 @@ import Top10Chart from "../components/Top10Chart";
 import HolidayCompareChart from "../components/HolidayCompareChart";
 import RiskPrediction from "../components/RiskPrediction";
 import AdminLogin from "../components/AdminLogin";
+import AdminUpload from "../components/AdminUpload";
 
 import {
     getSummaryData,
@@ -15,12 +16,15 @@ import {
     getHolidayCompareData,
     getProvinceList
 } from "../api/apiService";
+import { use } from "react";
 
 const Dashboard = () => {
 
     const [activeTab, setActiveTab] = useState('dashboard');
 
     const [isLoginOpen, setIsLoginOpen] = useState(false);
+
+    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
     
     const initialFilters = {
         year: '2025',
@@ -115,6 +119,8 @@ const Dashboard = () => {
 
     const handleLoginSuccess = () => {
         alert('เข้าสู่ระบบแอดมินสำเร็จ:)')
+        setIsAdminLoggedIn(true);
+        setActiveTab('upload');
     };
 
     return (
@@ -194,8 +200,10 @@ const Dashboard = () => {
                             loading={loading} 
                         />
                     </>
-                ) : (
+                ) : activeTab === 'prediction' ? (
                     <RiskPrediction />
+                ) : (
+                    <AdminUpload />
                 )}
             </main>
 
