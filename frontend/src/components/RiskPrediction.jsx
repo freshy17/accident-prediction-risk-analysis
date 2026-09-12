@@ -80,7 +80,7 @@ function RiskPrediction() {
                 const list = Array.isArray(districtData) ? districtData : [];
                 setDistricts(list);
 
-                //ตรวจสอบว่า district_code ที่ค้างอยู่ใน sessuonStorage มีอยู่ในรายชื่ออำเภอนั้นจริงๆไหม
+                //ตรวจสอบว่า district_code ที่ค้างอยู่ใน sessionStorage มีอยู่ในรายชื่ออำเภอนั้นจริงๆไหม
                 const savedData = sessionStorage.getItem('risk_form_data');
                 if(savedData) {
                     const parsed = JSON.parse(savedData);
