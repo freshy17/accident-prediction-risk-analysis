@@ -686,9 +686,17 @@ html, body, #root {
 }
 
 .admin-form-container h2 {
-  margin-bottom: 20px;
-  color: #333;
+  margin-bottom: 25px;
+  color: #2c3e50;
   text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.admin-form-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .success-message {
@@ -702,7 +710,9 @@ html, body, #root {
 }
 
 .form-group {
-  margin-bottom: 15px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
 }
 
 .form-group label {
@@ -713,23 +723,38 @@ html, body, #root {
 }
 
 .form-control {
-  width: 100%;
-  padding: 8px;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
+    padding: 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    background-color: #f7fafc;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-control:hover {
+    border-color: #3182ce;
+    background-color: #edf2f7;
 }
 
 .submit-btn {
-  padding: 10px 20px;
-  background-color: #007bff;
+  padding: 12px 24px;
+  background-color: #3182ce;
   color: #fff;
-  border-radius: 4px;
+  border: none;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.2s, transform 0.1s;
+  width: 100%;
+  margin-top: 10px;
 }
 
 .submit-btn:hover {
   background-color: #0056b3;
 }
+
+.submit-btn:active {
+  transform: scale(0.98);
+} 

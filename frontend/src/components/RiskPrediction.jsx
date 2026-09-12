@@ -21,39 +21,48 @@ function RiskPrediction() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     
-    const [formData, setFormData] = useState({
-        province_code: '',
-        district_code: '',
-        timeRange: '',
-        dayType: '',
-        weather: ''
+    const [formData, setFormData] = useState(() => {
+        const savedData = sessionStorage.getItem('risk_form_data');
+        return savedData ? JSON.parse(savedData) : {
+            province_code: '',
+            district_code: '',
+            timeRange: '',
+            dayType: '',
+            weather: ''
+        };
     });
 
-    // State เก็บผลลัพธ์จริงจาก API 
-    const [result, setResult] = useState(null);
+    //โหลดค่า result เริ่มต้นจาก sessionStorage (ถ้ามี)
+    const [result, setResult] = useState(() => {
+        const savedResult = sessionStorage.getItem('risk_result');
+        return savedResult ? JSON.parse(savedResult) : null;
+    })
 
-    //โหลดตัวเลือกทั้งหมดเมื่อหน้าเว็บเริ่มทำงาน
+    //บันทึก formData ลง sessionStorage ทุกครั้งที่มีการเปลี่ยนแปลง
+    useEffect(() => {
+        sessionStorage.setItem('risk_form_data', JSON.stringify(formData));
+    }, [formData]);
+
+    //บันทึกหรือลบผลลัพธ์ใน sessionStorage ทุกครั้งที่ผลลัพธ์เปลี่ยน
+    useEffect(() => {
+        if (result) {
+            sessionStorage.setItem('risk_result', JSON.stringify(result));
+        } else {
+            sessionStorage.removeItem('risk_result');
+        }
+    }, [result]);
+
+    //โหลดตัวเลือกทั้งหมดครั้งเดียวตอนเปิดหน้าเว็บ
     useEffect(() => {
         const fetchInitialOptions = async () => {
             try {
                 const data = await getFilterOptions();
-                const provinces = data?.provinces || [];
-                const timeRanges = data?.timeRanges || [];
-                const dayTypes = data?.dayTypes || [];
-                const weathers = data?.weathers || [];
-
-                setOptions({ provinces, timeRanges, dayTypes, weathers });
-
-                //กำหนดค่าเริ่มต้นถ้ามีข้อมูล
-                setFormData(prev => ({
-                    ...prev,
-                    province_code: '',
-                    district_code: '',
-                    timeRange: '',
-                    dayType: '',
-                    weather: ''
-                }));
-
+                setOptions({
+                    provinces: data?.provinces || [],
+                    timeRanges: data?.timeRanges || [],
+                    dayTypes: data?.dayTypes || [],
+                    weathers: data?.weathers || [],
+                });
             } catch (err) {
                 console.error("Error fetching options:", err);
             }
@@ -61,40 +70,64 @@ function RiskPrediction() {
         fetchInitialOptions();
     }, []);
 
-    //ดึงรายชื่ออำเภอใหม่ทุกครั้งที่เลือกจังหวัดใหม่
+    //โหลดรายชื่ออำเภอทันทีที่เปืดหน้ามาแล้วมีจังหวัดเลือกค้างอยู่
     useEffect(() => {
-        const fetchDistricts = async () => {
-            if (!formData.province_code) {
-                setDistricts([]);
-                setFormData(prev => ({ ...prev, district_code: '' }));
-                return;
-            }
+        const fetchDistrictsOnload = async () => {
+            if (!formData.province_code) return;
             try {
                 setLoadingDistricts(true);
                 const districtData = await getDistrictsByProvinceCode(formData.province_code);
-                setDistricts(districtData || []);
-
                 const list = Array.isArray(districtData) ? districtData : [];
-                 setDistricts(list);
+                setDistricts(list);
 
-                setFormData(prev => ({
-                ...prev, 
-                district_code: ''
-            }));
+                //ตรวจสอบว่า district_code ที่ค้างอยู่ใน sessuonStorage มีอยู่ในรายชื่ออำเภอนั้นจริงๆไหม
+                const savedData = sessionStorage.getItem('risk_form_data');
+                if(savedData) {
+                    const parsed = JSON.parse(savedData);
+                    if(parsed.district_code) {
+                        const exists = list.some(d => String(d.district_code) === String(parsed.district_code));
+                        if(exists) {
+                            setFormData(prev => ({ ...prev, district_code: parsed.district_code}));
+                        }
+                    }
+                }
             } catch (err) {
                 console.error("Error fetching districts:", err);
             } finally {
                 setLoadingDistricts(false);
             }
         };
-        fetchDistricts();
-    }, [formData.province_code])
+        fetchDistrictsOnload();
+    }, [formData.province_code]);
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
+    const handleChange =  async (e) => {
+        const {name, value} = e.target;
 
-    //ฟังก์ชันยิง API พยากรณ์ความเสี่ยง
+        if(name === 'province_code') {
+            //ถ้าเปลี่ยนจังหวัด ให้ Reset อำเภอเป็นค่าว่างทันที
+            setFormData(prev => ({
+                ...prev,
+                province_code: value,
+                districts_code: ''
+            }));
+
+            if(!value) {
+                setDistricts([]);
+            } else {
+                setLoadingDistricts(true);
+                try {
+                    const districtData = await getDistrictsByProvinceCode(value);
+                    setDistricts(Array.isArray(districtData) ? districtData : []);
+                } catch (err) {
+                    console.error("Error fetching districts:", err);
+                } finally {
+                    setLoadingDistricts(false);
+                }
+            }
+        } else {
+            setFormData(prev => ({...prev, [name]: value}));
+        }
+};
     const handlePredict = async () => {
         if (!formData.district_code || !formData.timeRange || !formData.dayType || !formData.weather) {
             alert("กรุณากรอกข้อมูลเงื่อนไขให้ครบถ้วนก่อนทำการพยากรณ์");
@@ -102,7 +135,6 @@ function RiskPrediction() {
         }
         setLoading(true);
         setError("");
-        // setTimeout(() => setLoading(false), 500);
 
         try {
             const data = await getRiskPrediction({
@@ -120,7 +152,6 @@ function RiskPrediction() {
                     type: item.value >= 0 ? 'positive' : 'negative'
                 }));
 
-                //สร้าง Auto Recommendation จากค่า Risk Score
                 let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจร";
                 if (data.risk_level === 'High') {
                     recText = "ปัจจัยหลักส่งผลให้ความเสี่ยงสูงมาก ควรเพิ่มความระมัดระวังในการเดินทาง ตั้งด่านกวดขันวินัยจราจร และตรวจเช็คสภาพถนน/ความเร็วอย่างเข้มงวด";
