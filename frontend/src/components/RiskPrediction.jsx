@@ -21,36 +21,46 @@ function RiskPrediction() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     
-    const [formData, setFormData] = useState(() => {
-        const savedData = sessionStorage.getItem('risk_form_data');
-        return savedData ? JSON.parse(savedData) : {
-            province_code: '',
-            district_code: '',
-            timeRange: '',
-            dayType: '',
-            weather: ''
-        };
+    // const [formData, setFormData] = useState(() => {
+    //     const savedData = sessionStorage.getItem('risk_form_data');
+    //     return savedData ? JSON.parse(savedData) : {
+    //         province_code: '',
+    //         district_code: '',
+    //         timeRange: '',
+    //         dayType: '',
+    //         weather: ''
+    //     };
+    // });
+
+    const [formData, setFormData] = useState({
+        province_code: '',
+        district_code: '',
+        timeRange: '',
+        dayType: '',
+        weather: ''
     });
 
+    const [result, setResult] = useState(null);
+
     //โหลดค่า result เริ่มต้นจาก sessionStorage (ถ้ามี)
-    const [result, setResult] = useState(() => {
-        const savedResult = sessionStorage.getItem('risk_result');
-        return savedResult ? JSON.parse(savedResult) : null;
-    })
+    // const [result, setResult] = useState(() => {
+    //     const savedResult = sessionStorage.getItem('risk_result');
+    //     return savedResult ? JSON.parse(savedResult) : null;
+    // })
 
     //บันทึก formData ลง sessionStorage ทุกครั้งที่มีการเปลี่ยนแปลง
-    useEffect(() => {
-        sessionStorage.setItem('risk_form_data', JSON.stringify(formData));
-    }, [formData]);
+    // useEffect(() => {
+    //     sessionStorage.setItem('risk_form_data', JSON.stringify(formData));
+    // }, [formData]);
 
-    //บันทึกหรือลบผลลัพธ์ใน sessionStorage ทุกครั้งที่ผลลัพธ์เปลี่ยน
-    useEffect(() => {
-        if (result) {
-            sessionStorage.setItem('risk_result', JSON.stringify(result));
-        } else {
-            sessionStorage.removeItem('risk_result');
-        }
-    }, [result]);
+    // //บันทึกหรือลบผลลัพธ์ใน sessionStorage ทุกครั้งที่ผลลัพธ์เปลี่ยน
+    // useEffect(() => {
+    //     if (result) {
+    //         sessionStorage.setItem('risk_result', JSON.stringify(result));
+    //     } else {
+    //         sessionStorage.removeItem('risk_result');
+    //     }
+    // }, [result]);
 
     //โหลดตัวเลือกทั้งหมดครั้งเดียวตอนเปิดหน้าเว็บ
     useEffect(() => {

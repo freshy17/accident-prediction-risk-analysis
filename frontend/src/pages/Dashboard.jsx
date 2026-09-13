@@ -21,9 +21,7 @@ import { use } from "react";
 const Dashboard = () => {
 
     const [activeTab, setActiveTab] = useState('dashboard');
-
     const [isLoginOpen, setIsLoginOpen] = useState(false);
-
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
     
     const initialFilters = {
@@ -176,42 +174,44 @@ const Dashboard = () => {
                 </div>
                 
                 {/* เงื่อนไขการสลับหน้าตาม Tap ที่เลือก */}
-                {activeTab === 'dashboard' ? (
-                    <>
-                        <FilterBar
-                            filters={filters}
-                            setFilters={setFilters}
-                            onReset={handleReset}
-                        />
-                        <SummaryCards 
-                            isFiltered={isFiltered}
-                            data={summaryData}
-                            loading={loading}
-                        />
-                        <div className="dashboard-grid">
-                            {/* ส่งข้อมูลลง Components เพื่อนำไปวาดหมุดและกราฟ */}
-                            <MapView filters={filters} data={hotspots} loading={loading} />
-                            <Top10Chart data={top10Data} filters={filters} loading={loading}/>
-                        </div>
-                        <HolidayCompareChart 
-                            data={holidayData} 
-                            filters={filters} 
-                            provinceName={selectedProvinceName} 
-                            loading={loading} 
-                        />
-                    </>
-                ) : activeTab === 'prediction' ? (
-                    <RiskPrediction />
-                ) : (
-                    <AdminUpload />
-                )}
-            </main>
+                {/* เงื่อนไขการสลับหน้าตาม Tab ที่เลือก (ใช้ CSS display ซ่อน/แสดงทั้งหมด) */}
+                <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+                    <FilterBar
+                        filters={filters}
+                        setFilters={setFilters}
+                        onReset={handleReset}
+                    />
+                    <SummaryCards 
+                        isFiltered={isFiltered}
+                        data={summaryData}
+                        loading={loading}
+                    />
+                    <div className="dashboard-grid">
+                        <MapView filters={filters} data={hotspots} loading={loading} />
+                        <Top10Chart data={top10Data} filters={filters} loading={loading}/>
+                    </div>
+                    <HolidayCompareChart 
+                        data={holidayData} 
+                        filters={filters} 
+                        provinceName={selectedProvinceName} 
+                        loading={loading} 
+                    />
+                </div>
 
-            <AdminLogin
-                isOpen={isLoginOpen}
-                onClose={() => setIsLoginOpen(false)}
-                onLoginSuccess={handleLoginSuccess}
-            />
+                <div style={{ display: activeTab === 'prediction' ? 'block' : 'none' }}>
+                    <RiskPrediction />
+                </div>
+
+                <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
+                    <AdminUpload />
+                </div>
+
+                <AdminLogin
+                    isOpen={isLoginOpen}
+                    onClose={() => setIsLoginOpen(false)}
+                    onLoginSuccess={handleLoginSuccess}
+                />
+            </main>
         </div>
     );
 };

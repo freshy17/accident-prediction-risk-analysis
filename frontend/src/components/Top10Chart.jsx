@@ -56,10 +56,15 @@ function Top10Chart({ filters }) {
     const hasSelectedProvince = Boolean(filters?.province);
     const provinceName = filters?.province_name || "";
 
+    const isBangkok = 
+        String(filters?.province_name || filters?.province || "").includes("กรุงเทพ") || 
+        String(filters?.province_code) === "10";
+
+    const areaLabel = isBangkok ? "เขต" : "อำเภอ";
     const yearText = filters?.year ? ` (ปี ${filters.year})` : '';
 
     const title = hasSelectedProvince
-        ? `Top 10 อำเภอที่เกิดอุบัติเหตุสูงสุดในจังหวัด${provinceName} ${yearText}`
+        ? `Top 10 ${areaLabel}ที่เกิดอุบัติเหตุสูงสุดในจังหวัด${provinceName} ${yearText}`
         : `Top 10 จังหวัดที่เกิดอุบัติเหตุสูงสุด${yearText}`;
 
     useEffect(() => {

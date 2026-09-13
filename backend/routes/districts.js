@@ -33,10 +33,11 @@ router.get('/risk', async (req, res) => {
                 d.dis_name_th,
                 d.latitude,
                 d.longitude,
+                SUM(s.total_accidents) AS total_accidents,
                 ROUND(AVG(s.risk_score), 2) AS risk_score,
                 CASE
-                    WHEN AVG(s.risk_score) >= 8 THEN 'high'
-                    WHEN AVG(s.risk_score) >= 3 THEN 'medium'
+                    WHEN AVG(s.risk_score) >= 60 THEN 'high'
+                    WHEN AVG(s.risk_score) >= 30 THEN 'medium'
                     ELSE 'low'
                 END AS risk_level
             FROM districts d
