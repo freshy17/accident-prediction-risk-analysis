@@ -198,8 +198,7 @@ function MapView({ filters }) {
     }
   };
 
-  //กำหนดสีและคำอธิบายตามระดับความเสี่ย
-
+  //กำหนดสีและคำอธิบายตามระดับความเสี่ยง
   const getRiskInfo = (score, level) => {
     const numScore = Number(score) || 0;
 

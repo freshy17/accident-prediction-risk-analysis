@@ -11,37 +11,6 @@ router.get('/', async (req, res) => {
         let params = [];
         let conditions = [];
 
-        // if (!province_code || province_code === '' || province_code === 'ทั้งหมด') {
-            
-        //     if (year && year !== '' && year !== 'ทั้งหมด') {
-        //         conditions.push('r.year = ?');
-        //         params.push(year);
-        //     }
-
-        //     const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''; 
-
-        //     //ภาพรวม 77 จังหวัด
-        //     querySql = `
-        //         SELECT 
-        //             p.province_code,
-        //             p.pro_name_th AS province_name,
-        //             p.latitude AS lat,
-        //             p.longitude AS lng,
-        //             ROUND(AVG(r.risk_score), 2) AS risk_score,
-        //             SUM(r.sample_size) AS sample_size,
-        //         CASE
-        //             WHEN AVG(r.risk_score) >= 50 THEN 'high'
-        //             WHEN AVG(r.risk_score) >= 20 THEN 'medium'
-        //             ELSE 'low'
-        //         END AS risk_level,
-        //         ANY_VALUE(r.top_factors) AS top_factors
-        //     FROM provinces p
-        //     LEFT JOIN risk_scores r ON p.province_code = r.province_code
-        //     ${whereClause}
-        //     GROUP BY p.province_code, p.pro_name_th, p.latitude, p.longitude
-        //     `;
-        // }
-
         if (!province_code || province_code === '' || province_code === 'ทั้งหมด') {
             
             // สร้างตัวแปรรับค่าปีสำหรับใส่ในเงื่อนไข Join
