@@ -6,17 +6,17 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 
 // แก้ปัญหาไอคอนหมุดของ Leaflet ไม่ยอมแสดงผลใน React
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+// import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+// import markerIcon from "leaflet/dist/images/marker-icon.png";
+// import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-delete L.Icon.Default.prototype._getIconUrl;
+// delete L.Icon.Default.prototype._getIconUrl;
 
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-});
+// L.Icon.Default.mergeOptions({
+//   iconUrl: markerIcon,
+//   iconRetinaUrl: markerIcon2x,
+//   shadowUrl: markerShadow,
+// });
 
 const THAILAND_CENTER = [13.736717, 100.523186];
 
@@ -86,9 +86,8 @@ function MapController({ hotspots, hasSelectedProvince }) {
       if (!hotspots || hotspots.length === 0) {
         // ถ้าไม่มีข้อมูลให้กลับมาที่กึ่งกลางประเทศไทย
         map.flyTo(THAILAND_CENTER, 5, {
-          duration: 1.5,
-
-          easeLinearity: 0.25,
+          duration: 1.5, //ระยะเวลาของการเคลื่อนย้ายจุด
+          easeLinearity: 0.25, //ช่วยเรื่องความเคลื่อนไหวที่สมูท พุ่งด้วยความเร็วแล้วค่อยๆเบรกช้าเมื่อใกล้ถึงจุดหมาย
         });
 
         return;
@@ -107,7 +106,7 @@ function MapController({ hotspots, hasSelectedProvince }) {
           .filter(Boolean);
 
         if (validBounds.length > 0) {
-          // คำนวณขอบเขตทุกอำเภอ แล้วให้ fitBounds เพื่อย้ายแผนที่ไปศูนย์กลางของจังหวัดนั้น
+          // คำนวณขอบเขตทุกอำเภอ แล้วให้ flyToBounds เพื่อย้ายแผนที่ไปศูนย์กลางของจังหวัดนั้น
           const bounds = L.latLngBounds(validBounds);
 
           //ซูมเจาะจงไปที่ขอบเขตของจังหวัดนั้นๆ
