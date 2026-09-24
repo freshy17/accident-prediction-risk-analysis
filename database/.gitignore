@@ -1,3 +1,4 @@
 accident_db_dump.sql
 schema.sql
 *.sql
+database/accident_db_dump.sql 
