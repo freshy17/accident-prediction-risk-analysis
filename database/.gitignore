@@ -1,4 +1,3 @@
-database/accident_db_dump.sql 
-database/schema.sql
+accident_db_dump.sql
+schema.sql
 *.sql
-git rm --cached database/accident_db_dump.sql
