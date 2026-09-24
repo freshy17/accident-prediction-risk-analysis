@@ -51,7 +51,7 @@ function HeatmapLayer({ points }) {
       blur: 15, // ระดับความฟุ้งเบลอของขอบสี
       maxZoom: 12, //ระดับการซูมสูงสุดที่จะแสดงผลความหนาแน่น
       max: 1.0,
-      gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red " }, // การไล่เฉดสี (น้อย -> มาก)
+      gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red" }, // การไล่เฉดสี (น้อย -> มาก)
     }).addTo(map); // สั่งให้ Layer นี้ไปวางแปะบนแผนที่จริง
 
     return () => {
@@ -309,3 +309,5 @@ function MapView({ filters }) {
 }
 
 export default MapView;
+
+
