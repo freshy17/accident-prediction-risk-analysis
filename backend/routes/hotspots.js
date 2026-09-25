@@ -51,27 +51,23 @@ router.get('/', async (req, res) => {
             const whereClause = ' WHERE ' + conditions.join(' AND ');
 
             querySql = `
-                SELECT
-                    h.hotspot_id,
-                    ANY_VALUE(h.province_code) AS province_code,
-                    ANY_VALUE(h.district_code) AS district_code,
-                    ANY_VALUE(h.latitude) AS lat,
-                    ANY_VALUE(h.longitude) AS lng,
-                    ANY_VALUE(h.density_score) AS density_score,
-                    ANY_VALUE(p.pro_name_th) AS province_name,
-                    ANY_VALUE(d.dis_name_th) AS district_name,
+                SELECT 
+                    d.district_code,
+                    d.province_code,
+                    d.dis_name_th AS district_name,
+                    p.pro_name_th AS province_name,
+                    d.latitude AS lat,
+                    d.longitude AS lng,
                     COALESCE(MAX(r.risk_score), 0) AS risk_score,
                     COALESCE(MAX(r.risk_level), 'low') AS risk_level,
                     COALESCE(MAX(r.sample_size), 0) AS sample_size,
                     COALESCE(MAX(r.top_factors), 'ไม่ระบุปัจจัย') AS top_factors
-                FROM hotspots h
-                LEFT JOIN provinces p ON h.province_code = p.province_code
-                LEFT JOIN districts d ON h.district_code = d.district_code
-                LEFT JOIN risk_scores r ON h.province_code = r.province_code
-                                        AND h.district_code = r.district_code
+                FROM districts d
+                LEFT JOIN provinces p ON d.province_code = p.province_code
+                LEFT JOIN risk_scores r ON d.province_code = r.province_code 
+                                    AND d.district_code = r.district_code
                 ${whereClause}
-                GROUP BY h.hotspot_id
-                LIMIT 1500
+                GROUP BY d.district_code
             `;
         }
 
