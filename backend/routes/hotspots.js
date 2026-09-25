@@ -2,58 +2,55 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
-//GET: /api/hotspots (ดึงพิกัดหมุดจากตาราง hotspots + ข้อมูลแสดงบน pop up จากตาราง risk_scores)
+//GET: /api/hotspots (ดึงพิกัดจุดความร้อนทั้งหมดของอุบัติเหตุจากตาราง hotspots มาทำ Heatmap)
 router.get('/', async (req, res) => {
-
     try {
-        const { province_code, year } = req.query;  
+        const { province_code, year } = req.query;
         let querySql = "";
         let params = [];
         let conditions = [];
 
-        if (!province_code || province_code === '' || province_code === 'ทั้งหมด') {
-            
-            // สร้างตัวแปรรับค่าปีสำหรับใส่ในเงื่อนไข Join
-            let yearCondition = '';
-            if (year && year !== '' && year !== 'ทั้งหมด') {
-                yearCondition = 'AND r.year = ?';
-                params.push(year);
-            }
+        //ถ้าไม่ได้เลือกจังหวัด ให้แสดงภาพรวมทั้งประเทศ โดยดึงพิกัดจุดมาจากตาราง hotspots
+        if(!province_code || province_code === '' || province_code === 'ทั้งหมด') {
 
-            // ภาพรวม 77 จังหวัด (ใช้ LEFT JOIN แบบกรองปีที่ ON)
-            querySql = `
-                SELECT 
-                    p.province_code,
-                    p.pro_name_th AS province_name,
-                    p.latitude AS lat,
-                    p.longitude AS lng,
-                    ROUND(AVG(r.risk_score), 2) AS risk_score,
-                    SUM(r.sample_size) AS sample_size,
-                CASE
-                    WHEN AVG(r.risk_score) >= 50 THEN 'high'
-                    WHEN AVG(r.risk_score) >= 20 THEN 'medium'
-                    ELSE 'low'
-                END AS risk_level,
-                ANY_VALUE(r.top_factors) AS top_factors
-                FROM provinces p
-                LEFT JOIN risk_scores r ON p.province_code = r.province_code ${yearCondition}
-                GROUP BY p.province_code, p.pro_name_th, p.latitude, p.longitude
-            `;
-        }
-         else {
-
-             //filter เลือกเฉพาะจังหวัด 
             if (year && year !== '' && year !== 'ทั้งหมด') {
                 conditions.push('h.year = ?');
                 params.push(year);
             }
-           
+
+            let whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+
+            //ดึงพิกัด lat/lng และความหนาแน่นจากตาราง hotspots
+            querySql = `
+                SELECT
+                    h.hotspot_id,
+                    h.province_code,
+                    p.pro_name_th AS province_name,
+                    h.latitude AS lat,
+                    h.longitude AS lng,
+                    COALESCE(h.density_score, 10) AS risk_score,
+                    'medium' AS risk_level,
+                    '' AS top_factors
+                FROM hotspots h
+                LEFT JOIN provinces p ON h.province_code = p.province_code
+                ${whereClause}
+                ORDER BY RAND()
+                LIMIT 3000
+            `;
+        }
+        else {
+            //เลือกจังหวัด ดึงรายอำเภอ
+            if (year && year !== '' && year !== 'ทั้งหมด') {
+                conditions.push('h.year = ?');
+                params.push(year);
+            }
+
             conditions.push('h.province_code = ?');
             params.push(province_code);
 
             const whereClause = ' WHERE ' + conditions.join(' AND ');
 
-            querySql =  `
+            querySql = `
                 SELECT
                     h.hotspot_id,
                     ANY_VALUE(h.province_code) AS province_code,
@@ -71,22 +68,20 @@ router.get('/', async (req, res) => {
                 LEFT JOIN provinces p ON h.province_code = p.province_code
                 LEFT JOIN districts d ON h.district_code = d.district_code
                 LEFT JOIN risk_scores r ON h.province_code = r.province_code
-                                    AND h.district_code = r.district_code
-                                    AND h.year = r.year
+                                        AND h.district_code = r.district_code
                 ${whereClause}
                 GROUP BY h.hotspot_id
-                LIMIT 100
-        `;
-    }
+                LIMIT 1500
+            `;
+        }
 
         const [rows] = await db.query(querySql, params);
-        res.json({ success: true, count: rows.length, data: rows})
+        res.json({ success: true, count: rows.length, data: rows });
 
     } catch (error) {
-        console.error('Error fetcing hotspots: ', error);
-        res.status(500).json({ success: false, message: 'Database query error', error: error.message});
+        console.error('Error fetching hotspots: ', error);
+        res.status(500).json({ success: false, message: 'Database query error', error: error.message });
     }
-
 });
 
 module.exports = router;

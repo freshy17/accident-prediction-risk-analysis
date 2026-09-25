@@ -47,11 +47,12 @@ function HeatmapLayer({ points }) {
     if (heatArray.length === 0) return;
 
     const heatLayer = L.heatLayer(heatArray, {
-      radius: 20, // รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
-      blur: 15, // ระดับความฟุ้งเบลอของขอบสี
-      maxZoom: 12, //ระดับการซูมสูงสุดที่จะแสดงผลความหนาแน่น
-      max: 1.0,
-      gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red" }, // การไล่เฉดสี (น้อย -> มาก)
+      radius: 10, // รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
+      blur: 6, // ระดับความฟุ้งเบลอของขอบสี     
+      maxZoom: 12,    
+      max: 50.0,      
+      minOpacity: 0.4,
+      gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red" },
     }).addTo(map); // สั่งให้ Layer นี้ไปวางแปะบนแผนที่จริง
 
     return () => {

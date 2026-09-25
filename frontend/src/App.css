@@ -61,9 +61,10 @@ html, body, #root {
 }
 
 .navbar-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 500;
   margin: 0;
+  white-space: nowrap;
 }
 
 .navbar-subtitle {
@@ -71,6 +72,42 @@ html, body, #root {
   color: #94a3b8;
   margin: 0;
   margin-top: 0.5rem;
+}
+
+@media screen and (max-width: 900px) {
+  .navbar {
+    flex-direction: column; /* เปลี่ยนให้ Navbar เรียงลงมาเป็นแนวตั้ง */
+    align-items: center;
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+
+  .navbar-brand {
+    position: static; /* เพื่อไม่ให้ทับกับปุ่ม */
+    transform: none;
+    flex-direction: column; 
+    text-align: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .navbar-title {
+    font-size: 1.2rem; 
+    white-space: normal; /* ตัดบรรทัดได้ตามความกว้างของจอ ipad/phone */
+    text-align: center;
+  }
+
+  .navbar-subtitle {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .nav-bar-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem; /* ย้ายปุ่มฟันเฟืองไปไว้มุมขวาบนสุดแบบลอยตัว */
+    margin-left: 0;
+  }
 }
 
 /* FilterBar */
