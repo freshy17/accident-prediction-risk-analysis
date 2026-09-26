@@ -101,8 +101,9 @@ model = model_package['model']
 cat_features = model_package['cat_features']
 feature_cols = model_package['feature_cols']
 categories = model_package['categories']
-q95 = model_package['q95']
-min_s = model_package['min_s']
+subdistrict_hist = model_package['subdistrict_hist']
+# q95 = model_package['q95']
+# min_s = model_package['min_s']
 fill_val = model_package['fill_val']
 
 explainer = shap.TreeExplainer(model)
@@ -135,10 +136,12 @@ def predict():
         else:
             subdist_total_cases = float(raw_cases)
 
-        #⚠️ ต้องเช็คให้ชัวร์ว่ามีการ scale ค่านี้ตอนเทรนหรือไม่ (ดูจาก notebook)
-        #ถ้ามี อาจจะต้องทำแบบนี้ก่อนใส่เข้าโมเดล:
-        # subdist_total_cases = min(subdist_total_cases, q95)  # clip ที่ q95
-        # subdist_total_cases = (subdist_total_cases - min_s) / (q95 - min_s)  # normalize
+        # ดึงค่า subdist_total_cases จาก subdistrict_hist แทนการนับจาก MySQL
+        match = subdistrict_hist[subdistrict_hist['subdistrict_code'] == subdistrict_code]
+        if not match.empty:
+            subdist_total_cases = float(match['subdist_total_cases'].values[0])
+        else:
+            subdist_total_cases = fill_val 
 
         row = {
             'province_code': province_code,
