@@ -4,7 +4,8 @@ const db = require('../config/db');
 const axios = require('axios');
 
 router.post('/', async (req, res) => {
-    const { district_code, timeRange, dayType, weather } = req.body;
+    // const { district_code, timeRange, dayType, weather } = req.body;
+    const { province_code, district_code, subdistrict_code, dayType, timeRange } = req.body;
 
     try {
         // 1. ค้นหาพิกัด lat/lng ของอำเภอจาก MySQL
@@ -23,10 +24,11 @@ router.post('/', async (req, res) => {
         const pythonRes = await axios.post('http://127.0.0.1:8001/predict', {
             latitude: parseFloat(latitude),
             longitude: parseFloat(longitude),
+            province_code,
             district_code,
-            timeRange,
-            dayType,
-            weather
+            subdistrict_code,
+            time_period: timeRange,  
+            day_type: dayType     
         });
 
         // 3. ส่งผลลัพธ์พยากรณ์กลับไปที่ Frontend

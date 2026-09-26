@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction } from "../api/apiService";
+import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode } from "../api/apiService";
 
 const DAY_TYPE_MAP = {
   'normal_day': 'วันธรรมดา (จ.-ศ.)',
@@ -13,11 +13,12 @@ function RiskPrediction() {
         provinces: [],
         timeRanges: [],
         dayTypes: [],
-        weathers: []
     });
 
     const [districts, setDistricts] = useState([]);
+    const [subdistricts, setSubdistricts] = useState([]);
     const [loadingDistricts, setLoadingDistricts] = useState(false);
+    const [loadingSubdistricts, setLoadingSubdistricts] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -25,9 +26,10 @@ function RiskPrediction() {
     const [formData, setFormData] = useState({
         province_code: '',
         district_code: '',
+        subdistrict_code: '',
         timeRange: '',
         dayType: '',
-        weather: ''
+        subdist_total_cases: 0
     });
 
     const [result, setResult] = useState(null);
@@ -36,12 +38,16 @@ function RiskPrediction() {
     useEffect(() => {
         const fetchInitialOptions = async () => {
             try {
-                const data = await getFilterOptions();
+                const response = await getFilterOptions();
+                console.log("Filter Options Response:", response); 
+                
+                // ดึงข้อมูลจาก response เผื่อถูกครอบด้วย data อีกชั้น
+                const resultData = response?.data || response; 
+
                 setOptions({
-                    provinces: data?.provinces || [],
-                    timeRanges: data?.timeRanges || [],
-                    dayTypes: data?.dayTypes || [],
-                    weathers: data?.weathers || [],
+                    provinces: resultData?.provinces || [],
+                    timeRanges: resultData?.timeRanges || [],
+                    dayTypes: resultData?.dayTypes || [],
                 });
             } catch (err) {
                 console.error("Error fetching options:", err);
@@ -84,12 +90,15 @@ function RiskPrediction() {
         const {name, value} = e.target;
 
         if(name === 'province_code') {
-            //ถ้าเปลี่ยนจังหวัด ให้ Reset อำเภอเป็นค่าว่างทันที
+            //ถ้าเปลี่ยนจังหวัด ให้ Reset อำเภอ ตำบล และจำนวนอุบัติเหตุในตำบล
             setFormData(prev => ({
                 ...prev,
                 province_code: value,
-                districts_code: ''
+                district_code: '',
+                subdistrict_code: '',
+                subdist_total_cases: 0
             }));
+            setSubdistricts([]);
 
             if(!value) {
                 setDistricts([]);
@@ -97,6 +106,7 @@ function RiskPrediction() {
                 setLoadingDistricts(true);
                 try {
                     const districtData = await getDistrictsByProvinceCode(value);
+                    console.log("District Data from API:", districtData);
                     setDistricts(Array.isArray(districtData) ? districtData : []);
                 } catch (err) {
                     console.error("Error fetching districts:", err);
@@ -104,25 +114,62 @@ function RiskPrediction() {
                     setLoadingDistricts(false);
                 }
             }
-        } else {
+        } else if (name === 'district_code') {
+            //เปลี่ยนอำเภอ ให้ Reset ตำบล และจำนวนอุบัติเหตุในตำบล แล้วดึงรายชื่อตำบลใหม่
+            setFormData(prev => ({
+                ...prev,
+                district_code: value,
+                subdistrict_code: '',
+                subdist_total_cases: 0
+            }));
+            setSubdistricts([]);
+
+            if(!value) {
+                setSubdistricts([]);
+            } else {
+                try {
+                    const subData = await getSubdistrictsByDistrictCode(value);
+                    setSubdistricts(Array.isArray(subData) ? subData : []);
+                } catch (err) {
+                    console.error("Error fetching subdistricts:", err);
+                } finally {
+                    setLoadingSubdistricts(false);
+                }
+            }
+        }
+        else if (name === 'subdistrict_code') {
+            //เลือกตำบล -> ให้ดึงค่า subdist_total_cases ของตำบลนั้นมาเก็บไว้
+            const selectedSub = subdistricts.find(s => String(s.subdistrict_code) === String(value));
+            setFormData(prev => ({
+                ...prev,
+                subdistrict_code: value,
+                subdist_total_cases: selectedSub ? Number(selectedSub.subdist_total_cases) : 0
+            }));
+        }
+        else {
             setFormData(prev => ({...prev, [name]: value}));
         }
 };
     const handlePredict = async () => {
-        if (!formData.district_code || !formData.timeRange || !formData.dayType || !formData.weather) {
+        if (!formData.district_code || !formData.subdistrict_code || !formData.timeRange || !formData.dayType) {
             alert("กรุณากรอกข้อมูลเงื่อนไขให้ครบถ้วนก่อนทำการพยากรณ์");
             return;
         }
         setLoading(true);
         setError("");
 
+        //แพ็คข้อมูลส่งให้หลังบ้าน
         try {
-            const data = await getRiskPrediction({
+            const payload = ({
+                province_code: formData.province_code,
                 district_code: formData.district_code,
+                subdistrict_code: formData.subdistrict_code,
                 timeRange: formData.timeRange,
                 dayType: formData.dayType,
-                weather: formData.weather
+                subdist_total_cases: formData.subdist_total_cases
             })
+
+            const data = await getRiskPrediction(payload);
 
             if (data.success) {
                 //แปลง shap_values จาก API ให้เข้ากับ UI 
@@ -132,11 +179,11 @@ function RiskPrediction() {
                     type: item.value >= 0 ? 'positive' : 'negative'
                 }));
 
-                let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจร";
+                let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจรในช่วงเวลาที่เลือก";
                 if (data.risk_level === 'High') {
-                    recText = "ปัจจัยหลักส่งผลให้ความเสี่ยงสูงมาก ควรเพิ่มความระมัดระวังในการเดินทาง ตั้งด่านกวดขันวินัยจราจร และตรวจเช็คสภาพถนน/ความเร็วอย่างเข้มงวด";
+                    recText = "ระดับความเสี่ยงสูงมาก! ควรเพิ่มความระมัดระวังในการเดินทางสูงสุดในช่วงเวลาและประเภทวันที่เลือก พร้อมกวดขันวินัยจราจรและตรวจสอบจุดเสี่ยงในพื้นที่";
                 } else if (data.risk_level === 'Medium') {
-                    recText = "มีความเสี่ยงปานกลาง ควรระมัดระวังเป็นพิเศษในช่วงเวลาและสภาพอากาศที่เลือก";
+                    recText = "มีความเสี่ยงปานกลาง ควรเพิ่มความระมัดระวังเป็นพิเศษในการขับขี่ตามช่วงเวลาและประเภทวันที่เลือก เพื่อป้องกันอุบัติเหตุในพื้นที่";
                 }
 
                 setResult({
@@ -207,6 +254,35 @@ function RiskPrediction() {
                     </select>
                 </div>
 
+                {/* ตำบล (แล้วแนบจำนวนอุบัติเหตุในตำบลนั้นๆไปด้วย) */}
+                 <div className="form-group">
+                    <label className="form-label">ตำบล</label>
+                    <select 
+                        name="subdistrict_code" 
+                        value={formData.subdistrict_code} 
+                        onChange={handleChange} 
+                        className="form-select"
+                        disabled={!formData.district_code || loadingSubdistricts}
+                    >
+                        {!formData.district_code ? (
+                            <option value="">-- กรุณาเลือกอำเภอก่อน --</option>
+                        ) : loadingSubdistricts ? (
+                            <option value="">(กำลังโหลดตำบล...)</option>
+                        ) : subdistricts.length > 0 ? (
+                            <>
+                                <option value="">-- เลือกตำบล --</option>
+                                {subdistricts.map((s) => (
+                                    <option key={s.subdistrict_code} value={s.subdistrict_code}>
+                                        {s.sub_name_th}
+                                    </option>
+                                 ))}
+                            </>
+                        ) : (
+                            <option value="">-- ไม่มีข้อมูลตำบล --</option>
+                        )} 
+                    </select>
+                </div>
+
                 {/* ช่วงเวลา */}
                <div className="form-group">
                     <label className="form-label">ช่วงเวลา</label>
@@ -237,21 +313,6 @@ function RiskPrediction() {
                             <option key={d} value={d}>
                                 {DAY_TYPE_MAP[d] || d}
                             </option>
-                        ))}
-                    </select>
-                </div>
-
-               <div className="form-group">
-                    <label className="form-label">สภาพอากาศ</label>
-                    <select 
-                    name="weather" 
-                    value={formData.weather} 
-                    onChange={handleChange} 
-                    className="form-select"
-                >
-                        <option value="">-- เลือกสภาพอากาศ --</option>
-                        {options.weathers.map((w) => (
-                            <option key={w} value={w}>{w}</option>
                         ))}
                     </select>
                 </div>

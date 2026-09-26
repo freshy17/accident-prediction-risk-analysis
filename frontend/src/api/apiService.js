@@ -101,7 +101,7 @@ export const getRiskPrediction = async (predictionData) => {
 //ดึงข้อมูลสำหรับ filter ใน Risk Prediction
 export const getFilterOptions = async () => {
     try {
-        const response = await axios.get(`${BASE_URL}/filters_riskPrediction/filter-options`);
+        const response = await axios.get(`${BASE_URL}/filters/options`);
         return response.data;
     } catch (error) {
         console.error("Error in getFilterOptions:", error);
@@ -113,8 +113,8 @@ export const getFilterOptions = async () => {
 export const getDistrictsByProvinceCode = async (provinceCode) => {
     if (!provinceCode) return [];
     try {
-        const response = await axios.get(`${BASE_URL}/districts`, {
-            params: { province_code: provinceCode }
+        const response = await axios.get(`${BASE_URL}/filters/districts`, {
+            params: { province: provinceCode }
         });
         return response.data;
     } catch (error) {
@@ -122,3 +122,16 @@ export const getDistrictsByProvinceCode = async (provinceCode) => {
         throw error;
     }
 };
+
+//ดึงข้อมูลตำบลตามอำเภอที่เลือก ใน Risk Prediction
+export const getSubdistrictsByDistrictCode = async (districtCode) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/filters/subdistricts`, {
+            params: { district_code: districtCode }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching subdistricts:", error);
+        throw error;
+    }
+}

@@ -31,7 +31,7 @@ app.use('/api/accidents', accidentRoutes);
 app.use('/api/risk_scores', risk_scoresRoutes);
 app.use('/api/hotspots', hotspotsRoutes);
 app.use('/api/summaries', summariesRoutes);
-app.use('/api/filters_riskPrediction', filterRoutes);
+app.use('/api/filters', filterRoutes);
 app.use('/api/predict', require('./routes/predict'));
 app.use('/api/admin', authRoutes);
 
