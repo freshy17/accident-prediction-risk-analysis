@@ -40,15 +40,15 @@ router.get('/', async (req, res) => {
         }
 
         if (conditions.length > 0) {
-            sql += 'WHERE' + conditions.join(' AND ');
+            sql += ' WHERE ' + conditions.join(' AND ');
         }
         sql += ' ORDER BY a.accident_id DESC';
 
         const [rows] = await db.query(sql, params);
-        res.json({ sucess: true, count: rows.length, data: rows});
+        res.json({ success: true, count: rows.length, data: rows});
     } catch (error) {
         console.error('Error fetching accidents: ', error);
-        res.status(500).json({sucess: false, message: 'Database query error', error: error.message});
+        res.status(500).json({sucess: false, message: 'Database query error'});
     }
 });
 
