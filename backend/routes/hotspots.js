@@ -40,12 +40,7 @@ router.get('/', async (req, res) => {
         }
         else {
             //เลือกจังหวัด ดึงรายอำเภอ
-            if (year && year !== '' && year !== 'ทั้งหมด') {
-                conditions.push('h.year = ?');
-                params.push(year);
-            }
-
-            conditions.push('h.province_code = ?');
+            conditions.push('d.province_code = ?');
             params.push(province_code);
 
             const whereClause = ' WHERE ' + conditions.join(' AND ');
