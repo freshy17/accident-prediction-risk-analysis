@@ -128,7 +128,7 @@ router.get('/', async (req, res) => {
 //GET: /api/summaries/top10 (Top 10 กราฟแท่ง)
 router.get('/top10', async (req, res) => {
     const { year } = req.query;
-    const province_code = req.query.province_code || req.query.province;
+    const province_code = req.query.province_code;
 
     try {
         let sql = '';
@@ -178,7 +178,7 @@ router.get('/top10', async (req, res) => {
 //GET: /api/summaries/compare (กราฟเปรียบเทียบ ปกติ & หยุดปีใหม่ & สงกรานต์)
 router.get('/compare', async (req, res) => {
     const { year } = req.query;
-    const province_code = req.query.province_code || req.query.province;
+    const province_code = req.query.province_code;
 
     try {
         let sql = '';
