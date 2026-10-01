@@ -121,7 +121,7 @@ router.get('/', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching summaries: ', error);
-        res.status(500).json({ success: false, message: 'Database query error', error: error.message});
+        res.status(500).json({ success: false, message: 'Database query error'});
     }
 });
 
@@ -171,7 +171,7 @@ router.get('/top10', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching top10: ', error);
-        res.status(500).json({ success: false, message: 'Database query error', error: error.message});
+        res.status(500).json({ success: false, message: 'Database query error'});
     }
 })
 
@@ -235,7 +235,7 @@ router.get('/compare', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching compare data: ', error);
-        res.status(500).json({ success: false, message: 'Database query error', error: error.message});
+        res.status(500).json({ success: false, message: 'Database query error'});
     }
 });
 
@@ -248,7 +248,7 @@ router.get('/years', async (req, res) => {
         res.json({ success: true, data: years });
     } catch (error) {
         console.error('Error fetching years: ', error);
-        res.status(500).json({ success: false, message: 'Database query error', error: error.message });
+        res.status(500).json({ success: false, message: 'Database query error'});
     }
 });
 
