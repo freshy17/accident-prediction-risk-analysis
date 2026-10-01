@@ -13,7 +13,6 @@ app.use(express.json());
 //import routes
 const provinceRoutes = require('./routes/provinces');
 const districtRoutes = require('./routes/districts');
-const risk_scoresRoutes = require('./routes/risk_scores');
 const hotspotsRoutes = require('./routes/hotspots');
 const summariesRoutes = require('./routes/summaries');
 const filterRoutes = require('./routes/filters_riskPrediction');
@@ -26,7 +25,6 @@ app.get('/', (req, res) => {
 
 app.use('/api/provinces', provinceRoutes);
 app.use('/api/districts', districtRoutes);
-app.use('/api/risk_scores', risk_scoresRoutes);
 app.use('/api/hotspots', hotspotsRoutes);
 app.use('/api/summaries', summariesRoutes);
 app.use('/api/filters', filterRoutes);
