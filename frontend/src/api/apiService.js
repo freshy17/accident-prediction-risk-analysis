@@ -28,7 +28,12 @@ export const getProvinceList = async () => {
 export const getSummaryData = async (filters) => {
     try {
         const response = await axios.get(`${BASE_URL}/summaries`, {
-        params: filters
+        params: {
+                year: filters.year,
+                province_code: filters.province,
+                time_period: filters.timeRange,
+                day_type: filters.dayType
+            }
     });
     return response.data
     } catch (error) {

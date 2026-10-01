@@ -4,24 +4,16 @@ const db = require('../config/db');
 
 // GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
 router.get('/', async (req, res) => {
-    const { 
-        province_code,  
-        time_period, 
-        day_type, 
-        year,
-        province,
-        timeRange,
-        dayType
-    } = req.query;
+    const { province_code, time_period, day_type, year } = req.query;
 
     try {
         let params = []; //ค่าตัวแปรส่งไปแทน ?
         let conditions = []; //เก็บคำสั่ง sql
 
         //ยุบตัวกรองที่หลายตัวแปรให้เหลือแค่ 1 ตัว
-        const provVal = (province || province_code || '').trim();
-        const timeVal = (timeRange || time_period || '').trim();
-        const dayVal = (dayType || day_type || '').trim();
+        const provVal = (province_code || '').trim();
+        const timeVal = (time_period || '').trim();
+        const dayVal = (day_type || '').trim();
         const yearVal = (year || '').trim();
 
         //แปลงจังหวัด
