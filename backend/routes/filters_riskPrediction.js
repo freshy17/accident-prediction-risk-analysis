@@ -13,13 +13,11 @@ router.get('/options', async (req, res) => {
         `);
         const [timeRanges] = await db.query("SELECT DISTINCT time_period FROM accidents WHERE time_period IS NOT NULL ORDER BY time_period ASC");
         const [dayTypes] = await db.query("SELECT DISTINCT day_type FROM accidents WHERE day_type IS NOT NULL ORDER BY day_type ASC");
-        const [weathers] = await db.query("SELECT DISTINCT weather FROM accidents WHERE weather IS NOT NULL ORDER BY weather ASC");
 
         res.json({
             provinces, 
             timeRanges: timeRanges.map(i => i.time_period),
             dayTypes: dayTypes.map(i => i.day_type),
-            weathers: weathers.map(i => i.weather)
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
