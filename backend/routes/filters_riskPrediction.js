@@ -20,17 +20,22 @@ router.get('/options', async (req, res) => {
             dayTypes: dayTypes.map(i => i.day_type),
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Error fetching options:", err);
+        res.status(500).json({ error: 'Internal Server Error'  });
     }
 });
 
 //ดึงอำเภอเฉพาะจังหวัดที่เลือก
 //GET /api/filters/districts?province=xx
 router.get('/districts', async(req, res) => {
-    try {
-        const { province } = req.query;
-        if (!province) return res.json([]);
+    const { province } = req.query;
+    
+    // if (!province) return res.json([]);
+    if (!province || isNaN(Number(province))) {
+        return res.status(400).json({ error: 'Missing or invalid province parameter' });
+    }
 
+    try {
        const [districts] = await db.query(`
             SELECT DISTINCT d.district_code, d.dis_name_th 
             FROM accidents a
@@ -38,10 +43,11 @@ router.get('/districts', async(req, res) => {
             WHERE a.province_code = ?
             ORDER BY d.dis_name_th ASC
         `, [province]);
-        
+
         res.json(districts);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Error fetching districts:", err);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
