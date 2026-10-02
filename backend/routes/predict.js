@@ -4,7 +4,6 @@ const db = require('../config/db');
 const axios = require('axios');
 
 router.post('/', async (req, res) => {
-    // const { district_code, timeRange, dayType, weather } = req.body;
     const { province_code, district_code, subdistrict_code, dayType, timeRange } = req.body;
 
     try {
@@ -20,7 +19,7 @@ router.post('/', async (req, res) => {
 
         const { latitude, longitude } = districts[0];
 
-        // 2. ส่ง latitude, longitude และพารามิเตอร์อื่นไปยัง Flask (Port 8001)
+        // 2. ส่ง lat,lng และพารามิเตอร์อื่นไปยัง Flask (Port 8001)
         const pythonRes = await axios.post('http://127.0.0.1:8001/predict', {
             latitude: parseFloat(latitude),
             longitude: parseFloat(longitude),
