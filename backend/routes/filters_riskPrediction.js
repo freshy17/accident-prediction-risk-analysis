@@ -38,8 +38,7 @@ router.get('/districts', async(req, res) => {
             WHERE a.province_code = ?
             ORDER BY d.dis_name_th ASC
         `, [province]);
-
-        // res.json(districts.map(d => d.district_name));
+        
         res.json(districts);
     } catch (err) {
         res.status(500).json({ error: err.message });
