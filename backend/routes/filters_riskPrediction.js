@@ -8,7 +8,8 @@ router.get('/options', async (req, res) => {
         const [provinces] = await db.query(`
             SELECT DISTINCT p.province_code, p.pro_name_th 
             FROM accidents a
-            JOIN provinces p ON a.province_code = p.province_code
+            JOIN provinces p 
+              ON a.province_code COLLATE utf8mb4_unicode_ci = p.province_code COLLATE utf8mb4_unicode_ci
             ORDER BY p.pro_name_th ASC
         `);
         const [timeRanges] = await db.query("SELECT DISTINCT time_period FROM accidents WHERE time_period IS NOT NULL ORDER BY time_period ASC");
@@ -30,7 +31,6 @@ router.get('/options', async (req, res) => {
 router.get('/districts', async(req, res) => {
     const { province } = req.query;
     
-    // if (!province) return res.json([]);
     if (!province || isNaN(Number(province))) {
         return res.status(400).json({ error: 'Missing or invalid province parameter' });
     }
@@ -39,7 +39,8 @@ router.get('/districts', async(req, res) => {
        const [districts] = await db.query(`
             SELECT DISTINCT d.district_code, d.dis_name_th 
             FROM accidents a
-            JOIN districts d ON a.district_code = d.district_code
+            JOIN districts d 
+              ON a.district_code COLLATE utf8mb4_unicode_ci = d.district_code COLLATE utf8mb4_unicode_ci
             WHERE a.province_code = ?
             ORDER BY d.dis_name_th ASC
         `, [province]);
@@ -81,4 +82,3 @@ router.get('/subdistricts', async (req, res) => {
 });
 
 module.exports = router;
-
