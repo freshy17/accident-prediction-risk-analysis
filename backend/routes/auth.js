@@ -106,13 +106,13 @@ router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
     if (!username || !password || password.length < 8) {
         return res.status(400).json({ success: false, message: 'ข้อมูลไม่ถูกต้อง (รหัสผ่านอย่างน้อยต้อง 8 ตัว)'});
     }
-    const safeRole = ALLOWED_ROLES.includes(role) ? role : 'admin';
+    const safeRole = ALLOWED_ROLES.includes(role) ? role : 'editor';
 
     try {
         // เช็คว่ามี username นี้ในระบบหรือยัง
-        const [existing] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+        const [existing] = await db.query('SELECT user_id FROM users WHERE username = ?', [username]);
         if (existing.length > 0) {
-            return res.status(400).json({ success: false, message: 'ชื่อผู้ใช้นี้มี ใช้งานในระบบแล้ว' });
+            return res.status(400).json({ success: false, message: 'ชื่อผู้ใช้นี้มีใช้งานในระบบแล้ว' });
         }
 
         // เข้ารหัสรหัสผ่านก่อนบันทึก
@@ -121,7 +121,7 @@ router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
         // บันทึกลงตาราง users (กำหนด role เป็น admin หรือค่าที่ส่งมา)
         await db.query(
             'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-            [username, hashedPassword, safeRole || 'admin']
+            [username, hashedPassword, safeRole]
         );
 
         res.status(201).json({ success: true, message: 'สร้างบัญชีแอดมินสำเร็จ' });

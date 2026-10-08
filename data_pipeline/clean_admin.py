@@ -119,11 +119,22 @@ def process_cleansing_pipeline(df):
         df['ชั่วโมง'] = df['เวลา'].astype(str).str.extract(r'^(\d{1,2}):')[0]
         df['ชั่วโมง'] = pd.to_numeric(df['ชั่วโมง'], errors='coerce').fillna(-1).astype(int)
 
+    # if 'วันที่เกิดเหตุ' in df.columns:
+    #     df['วันที่เกิดเหตุ'] = df['วันที่เกิดเหตุ'].apply(parse_mixed_dates)
+    #     df['year'] = df['วันที่เกิดเหตุ'].dt.year
+    #     df['month'] = df['วันที่เกิดเหตุ'].dt.month
+    #     df['day'] = df['วันที่เกิดเหตุ'].dt.day
+    #     df['dayofweek'] = df['วันที่เกิดเหตุ'].dt.dayofweek
+    #     df['is_weekend'] = df['dayofweek'].isin([5, 6]).astype(int)
+
     if 'วันที่เกิดเหตุ' in df.columns:
         df['วันที่เกิดเหตุ'] = df['วันที่เกิดเหตุ'].apply(parse_mixed_dates)
-        df['year'] = df['วันที่เกิดเหตุ'].dt.year
-        df['month'] = df['วันที่เกิดเหตุ'].dt.month
-        df['day'] = df['วันที่เกิดเหตุ'].dt.day
+        df = df[df['วันที่เกิดเหตุ'].notna()].copy()
+        if df.empty:
+            return df
+        df['year'] = df['วันที่เกิดเหตุ'].dt.year.astype(int)
+        df['month'] = df['วันที่เกิดเหตุ'].dt.month.astype(int)
+        df['day'] = df['วันที่เกิดเหตุ'].dt.day.astype(int)
         df['dayofweek'] = df['วันที่เกิดเหตุ'].dt.dayofweek
         df['is_weekend'] = df['dayofweek'].isin([5, 6]).astype(int)
 
