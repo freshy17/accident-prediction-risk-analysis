@@ -26,6 +26,15 @@ COLUMN_MAP = {
     'is_dangerous_7days': 'is_dangerouse_7days',
 }
 
+RENAME_2026 = {
+    'จำนวนผู้เสียชีวิต': 'ผู้เสียชีวิต',
+    'จำนวนผู้บาดเจ็บสาหัส': 'ผู้บาดเจ็บสาหัส',
+    'จำนวนผู้บาดเจ็บเล็กน้อย': 'ผู้บาดเจ็บเล็กน้อย',
+    'บริเวณที่เกิดเหตุ/ลักษณะทาง': 'บริเวณที่เกิดเหตุ',
+    'ลักษณะการเกิดอุบัติเหตุ': 'ลักษณะการเกิดเหตุ',
+    'หน่วยงาน': 'agency',
+}
+
 # ฟังก์ชันจาก notebook (clean_admin.ipynb)
 def parse_mixed_dates(val):
     try:
@@ -77,6 +86,7 @@ def calculate_severity(row):
 
 
 def process_cleansing_pipeline(df):
+    df = df.rename(columns=RENAME_2026)
     df['LATITUDE'] = pd.to_numeric(df['LATITUDE'], errors='coerce')
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'], errors='coerce')
     valid_lat = (df['LATITUDE'] >= 5.0) & (df['LATITUDE'] <= 21.0)
