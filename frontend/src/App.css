@@ -801,3 +801,11 @@ html, body, #root {
 .submit-btn:active {
   transform: scale(0.98);
 } 
+
+.warning-message {
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    padding: 8px 12px;
+    border-radius: 6px;
+}

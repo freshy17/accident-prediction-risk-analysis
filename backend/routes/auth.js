@@ -43,7 +43,7 @@ router.post('/login', async(req, res) => {
             return res.status(401).json({ success: false, message: 'The username or password is incorrect.'});
         }
 
-        const token = jwt.sign(
+        const token = jwt.sign( 
             { userId: user.user_id, username: user.username, role: user.role },
             JWT_SECRET,
             { expiresIn: '2h'}
@@ -62,9 +62,25 @@ router.post('/login', async(req, res) => {
     }
 });
 
+//Middleware เช็กว่าเป็นแอดมินจริงไหม
+const requireAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึง'});
+    }
+    next();
+};
+
+const ALLOWED_ROLES = ['admin', 'editor'];
+
 //API Create Admin
-router.post('/register-admin', async (req, res) => {
+router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
     const { username, password, role } = req.body;
+
+    //ตรวจสอบ input
+    if (!username || !password || password.length < 8) {
+        return res.status(400).json({ success: false, message: 'ข้อมูลไม่ถูกต้อง (รหัสผ่านอย่างน้อยต้อง 8 ตัว)'});
+    }
+    const safeRole = ALLOWED_ROLES.includes(role) ? role : 'admin';
 
     try {
         // เช็คว่ามี username นี้ในระบบหรือยัง
@@ -79,7 +95,7 @@ router.post('/register-admin', async (req, res) => {
         // บันทึกลงตาราง users (กำหนด role เป็น admin หรือค่าที่ส่งมา)
         await db.query(
             'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-            [username, hashedPassword, role || 'admin']
+            [username, hashedPassword, safeRole || 'admin']
         );
 
         res.status(201).json({ success: true, message: 'สร้างบัญชีแอดมินสำเร็จ' });
@@ -91,7 +107,7 @@ router.post('/register-admin', async (req, res) => {
 });
 
 //API สำหรับ เพิ่มข้อมูลหน้า AdminUpload
-router.post('/add-data', verifyToken, async (req, res) => {
+router.post('/add-data', verifyToken, requireAdmin, async (req, res) => {
     const { title, description } = req.body;
 
     try {
