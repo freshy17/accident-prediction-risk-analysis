@@ -11,7 +11,7 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 #โหลด package ที่รวมทุกอย่างไว้
-model_package = joblib.load(os.path.join(BASE_DIR, 'new_lightgbm_risk_model.pkl'))
+model_package = joblib.load(os.path.join(BASE_DIR, 'new_lightgbm_risk_model2.pkl'))
 
 model = model_package['model']
 cat_features = model_package['cat_features']
