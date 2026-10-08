@@ -1,10 +1,36 @@
 const express = require('express')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const { parse } = require('csv-parse/sync');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const db = require('../config/db');
 
+const execFileAsync = promisify(execFile);
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; 
+const PYTHON_CMD = process.env.PYTHON_CMD || 'python';
+// ปรับ path ให้ตรงกับที่เก็บ clean_admin.py จริง 
+const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
+    path.join(__dirname, '..', '..', 'data_pipeline', 'clean_admin.py');
+
+const upload = multer({
+    dest: path.join(os.tmpdir(), 'accident-uploads'),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: (req, file, cb) => {
+        if (!file.originalname.toLowerCase().endsWith('.csv')) {
+            return cb(new Error('รองรับเฉพาะไฟล์ .csv เท่านั้น'));
+        }
+        cb(null, true);
+    }
+});
+
 
 //Middleware ตรวจสอบ Token แอดมิน
 const verifyToken = (req, res, next) => {
@@ -23,6 +49,14 @@ const verifyToken = (req, res, next) => {
         req.user = user;
         next(); //ผ่านแล้ว ไปทำฟังก์ชันต่อไปได้ก็คือ /add-data 
     });
+};
+
+//Middleware เช็กว่าเป็นแอดมินจริงไหม
+const requireAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึง'});
+    }
+    next();
 };
 
 //API สำหรับ Admin Login
@@ -62,17 +96,9 @@ router.post('/login', async(req, res) => {
     }
 });
 
-//Middleware เช็กว่าเป็นแอดมินจริงไหม
-const requireAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึง'});
-    }
-    next();
-};
-
+//API Create Admin
 const ALLOWED_ROLES = ['admin', 'editor'];
 
-//API Create Admin
 router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
     const { username, password, role } = req.body;
 
@@ -107,21 +133,109 @@ router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
 });
 
 //API สำหรับ เพิ่มข้อมูลหน้า AdminUpload
-router.post('/add-data', verifyToken, requireAdmin, async (req, res) => {
-    const { title, description } = req.body;
+router.post('/add-data', verifyToken, requireAdmin,
+    //รับไฟล์ข้อมูลชุดใหม่
+    (req, res, next) => {
+        upload.single('file')(req, res, (err) => {
+            if (err) {
+                const msg = err.code === 'LIMIT_FILE_SIZE' ? 'ไฟล์ใหญ่เกิน 10 MB' : err.message;
+                return res.status(400).json({ success: false, message: msg });
+            }
+            next();
+        });
+    },
+    async (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'ไม่พบไฟล์ที่อัปโหลด' });
+        }
+        const inputPath = req.file.path;
+        const outputPath = `${inputPath}_cleaned.csv`;
 
-    try {
-        await db.query(
-            'INSERT INTO accidents (title, description) VALUES (?, ?)',
-            [title, description]
-        );
+        try {
+            //คลีนข้อมูลด้วย Python Script
+            try {
+                await execFileAsync(PYTHON_CMD, [CLEAN_SCRIPT, inputPath, outputPath],
+                    { encoding: 'utf8', timeout: 120000 });
+            } catch (e) {
+                const detail = String(e.stdout || e.stderr || e.message).trim();
+                return res.status(422).json({ success: false, message: `คลีนข้อมูลไม่สำเร็จ: ${detail}` });
+            }
 
-        res.status(201).json({ success: true, message: 'เพิ่มข้อมูลไฟล์อุบัติเหตุสำเร็จ' });
+            //อ่านไฟล์ที่คลีนเสร็จแล้ว
+            const records = parse(fs.readFileSync(outputPath, 'utf8'),
+                { columns: true, skip_empty_lines: true, bom: true });
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Error in Server '});
+            if (records.length === 0) {
+                return res.status(422).json({
+                    success: false,
+                    message: 'ไม่พบแถวที่ใช้ได้หลังคลีนข้อมูล (โปรดตรวจพิกัดและรูปแบบไฟล์)'
+                });
+            }
+
+            //เทียบคอลัมน์กับตาราง accidents จริง (ข้ามคอลัมน์ auto_increment)
+            const [colRows] = await db.query(
+                `SELECT COLUMN_NAME AS name, EXTRA AS extra
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'accidents'`
+            );
+            const tableCols = colRows
+                .filter(c => !/auto_increment/i.test(c.extra))
+                .map(c => c.name);
+            const fileCols = Object.keys(records[0]);
+            const useCols = fileCols.filter(c => tableCols.includes(c));
+            const ignoredColumns = fileCols.filter(c => !tableCols.includes(c));
+            const emptyColumns = tableCols.filter(c => !fileCols.includes(c));
+
+            if (useCols.length === 0) {
+                return res.status(422).json({
+                    success: false,
+                    message: 'ไม่มีคอลัมน์ในไฟล์ที่ตรงกับตาราง accidents'
+                });
+            }
+
+            //insert เป็นชุด ใน transaction (ถ้าพังกลางทางจะ rollback ทั้งหมด)
+            const conn = await db.getConnection();
+            let inserted = 0;
+            try {
+                await conn.beginTransaction();
+                const colSql = useCols.map(c => `\`${c}\``).join(', ');
+
+                for (let i = 0; i < records.length; i += 1000) {
+                    const chunk = records.slice(i, i + 1000)
+                        .map(r => useCols.map(c => (r[c] === '' ? null : r[c])));
+                    const [result] = await conn.query(
+                        `INSERT INTO accidents (${colSql}) VALUES ?`, [chunk]);
+                    inserted += result.affectedRows;
+                }
+
+                await conn.commit();
+            } catch (e) {
+                await conn.rollback();
+                throw e;   // ส่งต่อให้ catch ด้านนอกตอบ error
+            } finally {
+                conn.release();
+            }
+
+            res.json({
+                success: true,
+                inserted,
+                totalRows: records.length,
+                ignoredColumns,
+                emptyColumns
+            });
+
+        } catch (error) {
+            console.error('add-data error:', error);
+            res.status(500).json({
+                success: false,
+                message: `เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${error.sqlMessage || error.message}`
+            });
+        } finally {
+            //ลบไฟล์ชั่วคราวทุกครั้ง
+            fs.unlink(inputPath, () => {});
+            fs.unlink(outputPath, () => {});
+        }
     }
-});
+);
 
 module.exports = router;
