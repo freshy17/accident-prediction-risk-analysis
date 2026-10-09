@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const db = require('../config/db');
+const { buildSubdistrictIndex, nearestSubdistrict } = require('./geoMatch');
 
 const execFileAsync = promisify(execFile);
 const router = express.Router();
@@ -20,6 +21,17 @@ const PYTHON_CMD = process.env.PYTHON_CMD || 'python';
 const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'clean_admin.py');
 
+const PROVINCE_ALIAS = {
+    'อยุธยา': 'พระนครศรีอยุธยา',
+    'กรุงเทพ': 'กรุงเทพมหานคร',
+    'กทม.': 'กรุงเทพมหานคร',
+    'กทม': 'กรุงเทพมหานคร'
+};
+const normProvince = (s) => {
+    const v = String(s ?? '').trim().replace(/^(จังหวัด|จ\.)\s*/, '').replace(/\s+/g, '');
+    return PROVINCE_ALIAS[v] || v;
+};
+
 const upload = multer({
     dest: path.join(os.tmpdir(), 'accident-uploads'),
     limits: { fileSize: MAX_FILE_SIZE },
@@ -30,7 +42,6 @@ const upload = multer({
         cb(null, true);
     }
 });
-
 
 //Middleware ตรวจสอบ Token แอดมิน
 const verifyToken = (req, res, next) => {
@@ -172,6 +183,52 @@ router.post('/add-data', verifyToken, requireAdmin,
                 });
             }
 
+            //แปลงชื่อจังหวัด -> province_code จากตาราง provinces (ไฟล์ใหม่ไม่มีรหัสมาให้)
+            const unmatchedProvinces = new Set();
+            if ('จังหวัด' in records[0] && !('province_code' in records[0])) {
+                const [provRows] = await db.query('SELECT province_code, pro_name_th FROM provinces');
+                const provMap = new Map(
+                    provRows.map(p => [normProvince(p.pro_name_th), String(p.province_code)])
+                );
+                for (const r of records) {
+                    const code = provMap.get(normProvince(r['จังหวัด']));
+                    if (code) {
+                        r.province_code = code;
+                    } else {
+                        r.province_code = '';   // บันทึกเป็น NULL
+                        const raw = String(r['จังหวัด'] ?? '').trim();
+                        if (raw && raw !== 'ไม่ระบุ') unmatchedProvinces.add(raw);
+                    }
+                }
+            }
+
+            //เติมรหัสอำเภอ/ตำบล/ชื่อตำบล จากพิกัด (ตำบลที่ใกล้ที่สุดในจังหวัดเดียวกัน)
+            //ใช้เฉพาะเมื่อไฟล์ไม่มี subdistrict_code มาให้ และมีพิกัดกับรหัสจังหวัดแล้ว
+            let geoMatched = 0;
+            let geoFar = 0;
+            const GEO_FAR_KM = 50;
+            if ('province_code' in records[0] && 'latitude' in records[0] && 'longitude' in records[0]
+                && !('subdistrict_code' in records[0])) {
+                const [subRows] = await db.query(
+                    'SELECT code, name_in_thai, latitude, longitude FROM subdistricts'
+                );
+                const subIndex = buildSubdistrictIndex(subRows);
+                for (const r of records) {
+                    const hit = nearestSubdistrict(subIndex, r.province_code, r.latitude, r.longitude);
+                    if (hit) {
+                        r.subdistrict_code = hit.subdistrict_code;
+                        r.district_code = hit.district_code;
+                        r.tambon = hit.tambon;
+                        geoMatched += 1;
+                        if (hit.distanceKm > GEO_FAR_KM) geoFar += 1;
+                    } else {
+                        r.subdistrict_code = '';
+                        r.district_code = '';
+                        r.tambon = '';
+                    }
+                }
+            }
+
             //เทียบคอลัมน์กับตาราง accidents จริง (ข้ามคอลัมน์ auto_increment)
             const [colRows] = await db.query(
                 `SELECT COLUMN_NAME AS name, EXTRA AS extra
@@ -221,7 +278,10 @@ router.post('/add-data', verifyToken, requireAdmin,
                 inserted,
                 totalRows: records.length,
                 ignoredColumns,
-                emptyColumns
+                emptyColumns,
+                unmatchedProvinces: [...unmatchedProvinces],
+                geoMatched,
+                geoFar
             });
 
         } catch (error) {

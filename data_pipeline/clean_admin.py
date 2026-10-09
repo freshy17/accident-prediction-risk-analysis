@@ -35,6 +35,8 @@ RENAME_2026 = {
     'หน่วยงาน': 'agency',
 }
 
+REQUIRED_COLS = ['ผู้เสียชีวิต', 'ผู้บาดเจ็บสาหัส']
+
 # ฟังก์ชันจาก notebook (clean_admin.ipynb)
 def parse_mixed_dates(val):
     try:
@@ -87,6 +89,11 @@ def calculate_severity(row):
 
 def process_cleansing_pipeline(df):
     df = df.rename(columns=RENAME_2026)
+
+    missing_required = [c for c in REQUIRED_COLS if c not in df.columns]
+    if missing_required:
+        raise ValueError(f"ไฟล์ขาดคอลัมน์สำคัญ: {', '.join(missing_required)}")
+
     df['LATITUDE'] = pd.to_numeric(df['LATITUDE'], errors='coerce')
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'], errors='coerce')
     valid_lat = (df['LATITUDE'] >= 5.0) & (df['LATITUDE'] <= 21.0)
