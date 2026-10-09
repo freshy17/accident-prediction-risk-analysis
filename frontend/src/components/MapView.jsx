@@ -47,9 +47,9 @@ function HeatmapLayer({ points }) {
     if (heatArray.length === 0) return;
 
     const heatLayer = L.heatLayer(heatArray, {
-      radius: 10, // รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
-      blur: 6, // ระดับความฟุ้งเบลอของขอบสี     
-      maxZoom: 12,    
+      radius: 12, // รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
+      blur: 7, // ระดับความฟุ้งเบลอของขอบสี     
+      maxZoom: 12, 
       max: 50.0,      
       minOpacity: 0.4,
       gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red" },
