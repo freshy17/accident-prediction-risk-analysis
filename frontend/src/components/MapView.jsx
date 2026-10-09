@@ -162,12 +162,13 @@ function MapView({ filters }) {
 
           rawData = rawData.filter((item) => {
             const pCode = String(item.province_code || item.prov_code || "",).toLowerCase();
-            const pName = String(item.province_code || item.prov_code || "",).toLowerCase();
+            const pName = String(item.province_name || item.prov_name || "",).toLowerCase();
 
             return (
               pCode === targetProv ||
-              pName.includes(targetProv) ||
-              targetProv.includes(pName)
+              (pName !== "" && (pName.includes(targetProv) || targetProv.includes(pName)))
+              // pName.includes(targetProv) ||
+              // targetProv.includes(pName)
             );
           });
         }

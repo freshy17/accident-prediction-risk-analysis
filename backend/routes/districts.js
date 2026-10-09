@@ -88,7 +88,7 @@ router.get('/risk', async (req, res) => {
             LEFT JOIN (
                 SELECT district_code, ROUND(AVG(risk_score), 2) AS risk_score
                 FROM summaries
-                WHERE ${sumConds.join(' AND ')}
+                WHERE ${sumConds.join(' AND ')} 
                 GROUP BY district_code
             ) sm ON CAST(sm.district_code AS UNSIGNED) = CAST(d.district_code AS UNSIGNED)
             ${hasProvince ? 'WHERE d.province_code = ?' : ''}
