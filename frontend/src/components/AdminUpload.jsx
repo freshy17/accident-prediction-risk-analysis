@@ -61,7 +61,7 @@ function AdminUpload() {
             });
 
             if (response.data.success) {
-                const { inserted, totalRows, ignoredColumns = [], emptyColumns = [] } = response.data;
+                const { inserted, totalRows, ignoredColumns = [], emptyColumns = [],  unmatchedProvinces = [], geoFar = 0 } = response.data;
                 setMessage(`เพิ่มข้อมูลสำเร็จ ${inserted} จาก ${totalRows} แถว`);
 
                 const notes = [];
@@ -71,6 +71,9 @@ function AdminUpload() {
                 if (emptyColumns.length > 0) {
                     notes.push(`คอลัมน์ในตารางที่ไฟล์ไม่มี (บันทึกเป็นค่าว่าง): ${emptyColumns.join(', ')}`);
                 }
+
+                if (unmatchedProvinces.length > 0) notes.push(`จังหวัดที่จับคู่รหัสไม่ได้: ${unmatchedProvinces.join(', ')}`);
+                if (geoFar > 0) notes.push(`${geoFar} แถวมีตำบลที่ใกล้ที่สุดห่างเกิน 50 กม. (อาจไม่แม่น)`);
                 setWarning(notes.join(' | '));
 
                 setFile(null);

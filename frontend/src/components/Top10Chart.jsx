@@ -108,7 +108,7 @@ function Top10Chart({ filters }) {
             <div className="chart-container-wrapper" style={{ height: '320px', width: '100% '}}>
                 {chartData.length === 0 && !loading ? (
                     <div className="no-data" style={{ textAlign: 'center', padding: '50px 0', color: '#64748b' }}>
-                        ไม่พบข้อมูลอุบัติเหตุในช่วงเวลาที่เลือก
+                        ไม่พบข้อมูลอุบัติเหตุในจังหวัดที่เลือก
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">

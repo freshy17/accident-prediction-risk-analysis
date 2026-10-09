@@ -63,16 +63,22 @@ function HolidayCompareChart({ filters = {}, provinceName = ''}) {
     }, [filters.year, filters.province]);
 
     return (
-        <div className='holiday-chart-card'>
-            <div className='holiday-chart-header'>
-                <Calendar size={20} color='#dc2626'/>
-                <h3>{title}</h3>
-            </div>
-            <div className='holiday-chart-wrapper'>
-                {loading ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#64748b'}}>(กำลังโหลดข้อมูล...)</div>
-                ) : (
-                    <ResponsiveContainer width="100%" height="100%">
+    <div className='holiday-chart-card'>
+        <div className='holiday-chart-header'>
+            <Calendar size={20} color='#dc2626'/>
+            <h3>{title}</h3>
+        </div>
+        <div className='holiday-chart-wrapper'>
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b'}}>
+                    (กำลังโหลดข้อมูล...)
+                </div>
+            ) : !chartData || chartData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b'}}>
+                    ไม่มีข้อมูลอุบัติเหตุในจังหวัดที่เลือก
+                </div>
+            ) : (
+                <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={chartData}
                         margin={{ top:20, right: 30, left: 0, bottom: 10}}
@@ -91,17 +97,17 @@ function HolidayCompareChart({ filters = {}, provinceName = ''}) {
                                 { value: 'วันปกติ', type: 'rect', color: '#94a3b8' },
                                 { value: 'เทศกาลปีใหม่', type: 'rect', color: '#f97316' },
                                 { value: 'เทศกาลสงกรานต์', type: 'rect', color: '#dc2626' }
-                            ]}  
+                            ]}
                         />
                         <Bar dataKey="normal" name="วันปกติ" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={18} />
                         <Bar dataKey="newYear" name="เทศกาลปีใหม่" fill="#f97316" radius={[4, 4, 0, 0]} barSize={18} />
                         <Bar dataKey="songkran" name="เทศกาลสงกรานต์" fill="#dc2626" radius={[4, 4, 0, 0]} barSize={18} />
                     </BarChart>
                 </ResponsiveContainer>
-                )}
-           </div>
+            )}
         </div>
-    );
+    </div>
+);
 }
 
 export default HolidayCompareChart;
