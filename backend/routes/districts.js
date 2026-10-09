@@ -46,6 +46,7 @@ const db = require('../config/db');
 //     }
 // });
 
+// GET: /api/districts/risk (ดึงข้อมูลความเสี่ยงแต่ละอำเภอ)
 router.get('/risk', async (req, res) => {
     const province_code = String(req.query.province_code || req.query.province || '').trim();
     const year = String(req.query.year || '').trim();
