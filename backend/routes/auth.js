@@ -176,6 +176,14 @@ router.post('/add-data', verifyToken, requireAdmin,
             const records = parse(fs.readFileSync(outputPath, 'utf8'),
                 { columns: true, skip_empty_lines: true, bom: true });
 
+            //อ่านสถิติจำนวนแถวที่ถูกตัดทิ้งตอนคลีน
+            let cleanStats = {};
+            try {
+                cleanStats = JSON.parse(fs.readFileSync(`${outputPath}.stats.json`, 'utf8'));
+            } catch (e) {
+                // ไม่มีไฟล์สถิติก็ข้ามไป ไม่ให้การอัปโหลดล้มเหลว
+            }
+
             if (records.length === 0) {
                 return res.status(422).json({
                     success: false,
@@ -250,6 +258,44 @@ router.post('/add-data', verifyToken, requireAdmin,
                 });
             }
 
+                        //กันข้อมูลซ้ำ: คีย์ที่ใช้ระบุว่าเป็นเหตุการณ์เดียวกัน
+            const DEDUP_KEYS = ['latitude', 'longitude', 'year', 'month', 'day', 'hour', 'road_name', 'vehicle']
+                .filter(k => useCols.includes(k));
+            const canDedup = DEDUP_KEYS.length === 8;
+
+            let rowsToInsert = records;
+            let skippedDuplicates = 0;
+
+            if (canDedup) {
+                const keyOf = (r) => DEDUP_KEYS.map(k => {
+                    const v = r[k];
+                    // ตัวเลขเทียบเป็นตัวเลข กัน 18.66476 กับ 18.664760 ไม่ตรงกัน
+                    return (['latitude', 'longitude', 'year', 'month', 'day', 'hour'].includes(k) && v !== '')
+                        ? String(Number(v)) : String(v ?? '').trim();
+                }).join('|');
+
+                // 1) ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
+                const seen = new Set();
+                const uniqueInFile = [];
+                for (const r of records) {
+                    const k = keyOf(r);
+                    if (!seen.has(k)) { seen.add(k); uniqueInFile.push(r); }
+                }
+
+                // 2) ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
+                const years = [...new Set(uniqueInFile.map(r => Number(r.year)).filter(Number.isFinite))];
+                const existing = new Set();
+                if (years.length > 0) {
+                    const [exRows] = await db.query(
+                        `SELECT ${DEDUP_KEYS.map(k => `\`${k}\``).join(', ')}
+                         FROM accidents WHERE year IN (?)`, [years]);
+                    for (const r of exRows) existing.add(keyOf(r));
+                }
+
+                rowsToInsert = uniqueInFile.filter(r => !existing.has(keyOf(r)));
+                skippedDuplicates = records.length - rowsToInsert.length;
+            }
+
             //insert เป็นชุด ใน transaction (ถ้าพังกลางทางจะ rollback ทั้งหมด)
             const conn = await db.getConnection();
             let inserted = 0;
@@ -257,8 +303,8 @@ router.post('/add-data', verifyToken, requireAdmin,
                 await conn.beginTransaction();
                 const colSql = useCols.map(c => `\`${c}\``).join(', ');
 
-                for (let i = 0; i < records.length; i += 1000) {
-                    const chunk = records.slice(i, i + 1000)
+                for (let i = 0; i < rowsToInsert.length; i += 1000) {
+                    const chunk = rowsToInsert.slice(i, i + 1000)
                         .map(r => useCols.map(c => (r[c] === '' ? null : r[c])));
                     const [result] = await conn.query(
                         `INSERT INTO accidents (${colSql}) VALUES ?`, [chunk]);
@@ -281,7 +327,15 @@ router.post('/add-data', verifyToken, requireAdmin,
                 emptyColumns,
                 unmatchedProvinces: [...unmatchedProvinces],
                 geoMatched,
-                geoFar
+                geoFar,
+                rawRows: cleanStats.raw_rows ?? null,
+                dropped: {
+                    badCoords: cleanStats.bad_coords ?? 0,
+                    duplicates: cleanStats.duplicates ?? 0,
+                    badDate: cleanStats.bad_date ?? 0
+                },
+                skippedDuplicates,
+                dedupApplied: canDedup,
             });
 
         } catch (error) {
@@ -294,6 +348,7 @@ router.post('/add-data', verifyToken, requireAdmin,
             //ลบไฟล์ชั่วคราวทุกครั้ง
             fs.unlink(inputPath, () => {});
             fs.unlink(outputPath, () => {});
+            fs.unlink(`${outputPath}.stats.json`, () => {});
         }
     }
 );

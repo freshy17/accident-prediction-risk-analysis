@@ -803,9 +803,15 @@ html, body, #root {
 } 
 
 .warning-message {
-    color: #92400e;
-    background: #fffbeb;
-    border: 1px solid #fcd34d;
-    padding: 8px 12px;
-    border-radius: 6px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+details { 
+  margin: 8px 0; 
+  font-size: 14px; 
+  color: #64748b; 
 }

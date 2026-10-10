@@ -8,12 +8,14 @@ function AdminUpload() {
     const [file, setFile] = useState(null);
     const [message, setMessage] = useState('');
     const [warning, setWarning] = useState('');
+    const [techDetail, setTechDetail] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     const clearAlerts = () => {
         setMessage('');
         setWarning('');
+        setTechDetail('');
         setError('');
     };
 
@@ -61,24 +63,59 @@ function AdminUpload() {
             });
 
             if (response.data.success) {
-                const { inserted, totalRows, ignoredColumns = [], emptyColumns = [],  unmatchedProvinces = [], geoFar = 0 } = response.data;
+            const { inserted, totalRows, ignoredColumns = [], emptyColumns = [],
+                    unmatchedProvinces = [], geoFar = 0,
+                    rawRows = null, dropped = {},
+                    skippedDuplicates = 0, dedupApplied = true } = response.data;
+
+            if (inserted === 0) {
+                setMessage('ไม่มีข้อมูลใหม่ ข้อมูลในไฟล์นี้มีอยู่ในระบบแล้วทั้งหมด');
+            } else {
                 setMessage(`เพิ่มข้อมูลสำเร็จ ${inserted} จาก ${totalRows} แถว`);
-
-                const notes = [];
-                if (ignoredColumns.length > 0) {
-                    notes.push(`คอลัมน์ในไฟล์ที่ไม่มีในตาราง (ถูกข้าม): ${ignoredColumns.join(', ')}`);
-                }
-                if (emptyColumns.length > 0) {
-                    notes.push(`คอลัมน์ในตารางที่ไฟล์ไม่มี (บันทึกเป็นค่าว่าง): ${emptyColumns.join(', ')}`);
-                }
-
-                if (unmatchedProvinces.length > 0) notes.push(`จังหวัดที่จับคู่รหัสไม่ได้: ${unmatchedProvinces.join(', ')}`);
-                if (geoFar > 0) notes.push(`${geoFar} แถวมีตำบลที่ใกล้ที่สุดห่างเกิน 50 กม. (อาจไม่แม่น)`);
-                setWarning(notes.join(' | '));
-
-                setFile(null);
-                form.reset();
             }
+
+            const notes = [];
+            const techNotes = []; 
+
+            const droppedTotal = (dropped.badCoords || 0) + (dropped.duplicates || 0) + (dropped.badDate || 0);
+            if (rawRows !== null && droppedTotal > 0) {
+                const reasons = [];
+                if (dropped.badCoords) reasons.push(`พิกัดผิด/ว่าง ${dropped.badCoords}`);
+                if (dropped.duplicates) reasons.push(`แถวซ้ำ ${dropped.duplicates}`);
+                if (dropped.badDate) reasons.push(`วันที่อ่านไม่ได้ ${dropped.badDate}`);
+                notes.push(`ไฟล์มี ${rawRows} แถว ตัดทิ้ง ${droppedTotal} แถว (${reasons.join(', ')})`);
+            }
+            if (skippedDuplicates > 0) {
+                notes.push(`ข้ามแถวที่ซ้ำ ${skippedDuplicates} แถว (ซ้ำกันในไฟล์หรือมีอยู่ในระบบแล้ว)`);
+            }
+            if (!dedupApplied) {
+                notes.push('ไม่สามารถตรวจแถวซ้ำได้ เพราะไฟล์ขาดคอลัมน์ที่ใช้เทียบ');
+            }
+            // if (ignoredColumns.length > 0) {
+            //     notes.push(`คอลัมน์ในไฟล์ที่ไม่มีในตาราง (ถูกข้าม): ${ignoredColumns.join(', ')}`);
+            // }
+            // if (emptyColumns.length > 0) {
+            //     notes.push(`คอลัมน์ในตารางที่ไฟล์ไม่มี (บันทึกเป็นค่าว่าง): ${emptyColumns.join(', ')}`);
+            // }
+            if (unmatchedProvinces.length > 0) {
+                notes.push(`จังหวัดที่จับคู่รหัสไม่ได้: ${unmatchedProvinces.join(', ')}`);
+            }
+            if (geoFar > 0) {
+                notes.push(`${geoFar} แถวมีตำบลที่ใกล้ที่สุดห่างเกิน 50 กม. (อาจไม่แม่น)`);
+            }
+            if (ignoredColumns.length > 0) {
+                techNotes.push(`คอลัมน์ในไฟล์ที่ไม่มีในตาราง (ถูกข้าม): ${ignoredColumns.join(', ')}`);
+            }
+            if (emptyColumns.length > 0) {
+                techNotes.push(`คอลัมน์ในตารางที่ไฟล์ไม่มี (บันทึกเป็นค่าว่าง): ${emptyColumns.join(', ')}`);
+            }
+
+            setWarning(notes.join(' | '));
+            setTechDetail(techNotes.join(' | '));
+
+            setFile(null);
+            form.reset();
+        }
             
         } catch (err) {
             console.error(err);
@@ -95,6 +132,12 @@ function AdminUpload() {
             {message && <p className="success-message">{message}</p>}
             {warning && <p className="warning-message">{warning}</p>}
             {error && <p className="error-message">{error}</p>}
+            {techDetail && (
+                <details>
+                    <summary>รายละเอียดคอลัมน์ (สำหรับผู้ดูแลระบบ)</summary>
+                    <p>{techDetail}</p>
+                </details>
+            )}
 
             <form onSubmit={handleSubmit}>
                 <div className="form-group">

@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import numpy as np
@@ -87,8 +88,11 @@ def calculate_severity(row):
         return 'รุนแรงน้อย (บาดเจ็บเล็กน้อย/ทรัพย์สินเสียหาย)'
 
 
-def process_cleansing_pipeline(df):
+def process_cleansing_pipeline(df, stats=None):
+    if stats is None:
+        stats = {}
     df = df.rename(columns=RENAME_2026)
+    stats.update(raw_rows=len(df), bad_coords=0, duplicates=0, bad_date=0)
 
     missing_required = [c for c in REQUIRED_COLS if c not in df.columns]
     if missing_required:
@@ -98,9 +102,14 @@ def process_cleansing_pipeline(df):
     df['LONGITUDE'] = pd.to_numeric(df['LONGITUDE'], errors='coerce')
     valid_lat = (df['LATITUDE'] >= 5.0) & (df['LATITUDE'] <= 21.0)
     valid_long = (df['LONGITUDE'] >= 97.0) & (df['LONGITUDE'] <= 106.0)
-    df = df[valid_lat & valid_long].copy()
 
+    n0 = len(df)
+    df = df[valid_lat & valid_long].copy()
+    stats['bad_coords'] = n0 - len(df)
+
+    n1 = len(df)
     df = df.drop_duplicates()
+    stats['duplicates'] = n1 - len(df)
 
     if df.empty:  # ไม่เหลือแถวที่พิกัดถูกต้อง
         return df
@@ -136,17 +145,11 @@ def process_cleansing_pipeline(df):
         df['ชั่วโมง'] = df['เวลา'].astype(str).str.extract(r'^(\d{1,2}):')[0]
         df['ชั่วโมง'] = pd.to_numeric(df['ชั่วโมง'], errors='coerce').fillna(-1).astype(int)
 
-    # if 'วันที่เกิดเหตุ' in df.columns:
-    #     df['วันที่เกิดเหตุ'] = df['วันที่เกิดเหตุ'].apply(parse_mixed_dates)
-    #     df['year'] = df['วันที่เกิดเหตุ'].dt.year
-    #     df['month'] = df['วันที่เกิดเหตุ'].dt.month
-    #     df['day'] = df['วันที่เกิดเหตุ'].dt.day
-    #     df['dayofweek'] = df['วันที่เกิดเหตุ'].dt.dayofweek
-    #     df['is_weekend'] = df['dayofweek'].isin([5, 6]).astype(int)
-
     if 'วันที่เกิดเหตุ' in df.columns:
         df['วันที่เกิดเหตุ'] = df['วันที่เกิดเหตุ'].apply(parse_mixed_dates)
+        n2 = len(df)
         df = df[df['วันที่เกิดเหตุ'].notna()].copy()
+        stats['bad_date'] = n2 - len(df)
         if df.empty:
             return df
         df['year'] = df['วันที่เกิดเหตุ'].dt.year.astype(int)
@@ -214,8 +217,11 @@ if __name__ == "__main__":
             print(f"Error: ไฟล์ขาดคอลัมน์ {', '.join(missing)}")
             sys.exit(1)
 
-        cleaned_df = to_db_schema(process_cleansing_pipeline(raw_df))
+        stats = {}
+        cleaned_df = to_db_schema(process_cleansing_pipeline(raw_df, stats))
         cleaned_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+        with open(output_path + ".stats.json", "w", encoding="utf-8") as f:
+            json.dump(stats, f)
         print(f"Cleansing Successfully! ({len(cleaned_df)} rows)")
     except Exception as e:
         print(f"Processing Error: {e}")
