@@ -187,8 +187,26 @@ function MapView({ filters }) {
   };
 
   //กำหนดสีและคำอธิบายตามระดับความเสี่ยง
-  const getRiskInfo = (score, level) => {
-    const numScore = Number(score) || 0;
+  // const getRiskInfo = (score, level) => {
+  //   const numScore = Number(score) || 0;
+
+  //   if (numScore >= 60) {
+  //     return { color: "#dc2626", label: "สูง", radius: 14 };
+  //   }
+
+  //   if (numScore >= 30) {
+  //     return { color: "#f97316", label: "ปานกลาง", radius: 11 };
+  //   }
+
+  //   return { color: "#22c55e", label: "ต่ำ", radius: 8 };
+  // };
+    //กำหนดสีและคำอธิบายตามระดับความเสี่ยง (ไม่มีคะแนน = สีเทา)
+  const getRiskInfo = (score) => {
+    if (score === null || score === undefined || score === "") {
+      return { color: "#9ca3af", label: "ยังไม่มีคะแนน", radius: 8 };
+    }
+
+    const numScore = Number(score);
 
     if (numScore >= 60) {
       return { color: "#dc2626", label: "สูง", radius: 14 };
@@ -252,10 +270,11 @@ function MapView({ filters }) {
               if (isNaN(lat) || isNaN(lng)) return null;
 
               const totalAccidents = Number(item.total_accidents || 0);
-              const riskScore = Number(item.risk_score || 0);
-              const riskInfo = getRiskInfo(riskScore, item.risk_level);
+              // const riskScore = Number(item.risk_score || 0);
+              // const riskInfo = getRiskInfo(riskScore, item.risk_level);
 
-              console.log("Map item:", item);
+              // console.log("Map item:", item);
+              const riskInfo = getRiskInfo(item.risk_score);
 
               const districtName =
                 item.district_name || item.dis_name_th || "ไม่ระบุอำเภอ";
@@ -289,7 +308,8 @@ function MapView({ filters }) {
                         </div>
 
                         <div className="popup-row">
-                          <span className="popup-label">ระดับความเสี่ยง:</span>
+                          {/* <span className="popup-label">ระดับความเสี่ยง:</span> */}
+                          <span className="popup-label">ระดับความเสี่ยงจากสถิติ:</span>
 
                           <strong
                             className="popup-value"
