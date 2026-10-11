@@ -260,7 +260,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 });
             }
 
-                        //กันข้อมูลซ้ำ: คีย์ที่ใช้ระบุว่าเป็นเหตุการณ์เดียวกัน
+            //กันข้อมูลซ้ำ: คีย์ที่ใช้ระบุว่าเป็นเหตุการณ์เดียวกัน
             const DEDUP_KEYS = ['latitude', 'longitude', 'year', 'month', 'day', 'hour', 'road_name', 'vehicle']
                 .filter(k => useCols.includes(k));
             const canDedup = DEDUP_KEYS.length === 8;
