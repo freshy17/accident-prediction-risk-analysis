@@ -66,7 +66,8 @@ function AdminUpload() {
             const { inserted, totalRows, ignoredColumns = [], emptyColumns = [],
                     unmatchedProvinces = [], geoFar = 0,
                     rawRows = null, dropped = {},
-                    skippedDuplicates = 0, dedupApplied = true } = response.data;
+                    skippedDuplicates = 0, dedupApplied = true, 
+                    scoreStatus = 'skipped' } = response.data;
 
             if (inserted === 0) {
                 setMessage('ไม่มีข้อมูลใหม่ ข้อมูลในไฟล์นี้มีอยู่ในระบบแล้วทั้งหมด');
@@ -91,17 +92,14 @@ function AdminUpload() {
             if (!dedupApplied) {
                 notes.push('ไม่สามารถตรวจแถวซ้ำได้ เพราะไฟล์ขาดคอลัมน์ที่ใช้เทียบ');
             }
-            // if (ignoredColumns.length > 0) {
-            //     notes.push(`คอลัมน์ในไฟล์ที่ไม่มีในตาราง (ถูกข้าม): ${ignoredColumns.join(', ')}`);
-            // }
-            // if (emptyColumns.length > 0) {
-            //     notes.push(`คอลัมน์ในตารางที่ไฟล์ไม่มี (บันทึกเป็นค่าว่าง): ${emptyColumns.join(', ')}`);
-            // }
             if (unmatchedProvinces.length > 0) {
                 notes.push(`จังหวัดที่จับคู่รหัสไม่ได้: ${unmatchedProvinces.join(', ')}`);
             }
             if (geoFar > 0) {
                 notes.push(`${geoFar} แถวมีตำบลที่ใกล้ที่สุดห่างเกิน 50 กม. (อาจไม่แม่น)`);
+            }
+            if (scoreStatus === 'failed') {
+                notes.push('บันทึกข้อมูลแล้ว แต่คำนวณคะแนนความเสี่ยงไม่สำเร็จ (แผนที่จะแสดง "ยังไม่มีคะแนน")');
             }
             if (ignoredColumns.length > 0) {
                 techNotes.push(`คอลัมน์ในไฟล์ที่ไม่มีในตาราง (ถูกข้าม): ${ignoredColumns.join(', ')}`);

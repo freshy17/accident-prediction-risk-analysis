@@ -20,6 +20,8 @@ const PYTHON_CMD = process.env.PYTHON_CMD || 'python';
 // ปรับ path ให้ตรงกับที่เก็บ clean_admin.py จริง 
 const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'clean_admin.py');
+const SCORE_SCRIPT = process.env.SCORE_SCRIPT ||
+    path.join(__dirname, '..', '..', 'data_pipeline', 'score_summaries.py');
 
 const PROVINCE_ALIAS = {
     'อยุธยา': 'พระนครศรีอยุธยา',
@@ -319,6 +321,23 @@ router.post('/add-data', verifyToken, requireAdmin,
                 conn.release();
             }
 
+            //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์
+            //ถ้าล้มเหลว ไม่ทำให้การอัปโหลดล้มเหลว (ข้อมูลเข้า accidents แล้ว)
+            let scoreStatus = 'skipped';
+            const yearsInFile = [...new Set(
+                rowsToInsert.map(r => Number(r.year)).filter(Number.isFinite)
+            )];
+            if (inserted > 0 && yearsInFile.length > 0) {
+                try {
+                    await execFileAsync(PYTHON_CMD, [SCORE_SCRIPT, yearsInFile.join(',')],
+                        { encoding: 'utf8', timeout: 120000 });
+                    scoreStatus = 'ok';
+                } catch (e) {
+                    console.error('score error:', e.stdout || e.stderr || e.message);
+                    scoreStatus = 'failed';
+                }
+            }
+
             res.json({
                 success: true,
                 inserted,
@@ -336,6 +355,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 },
                 skippedDuplicates,
                 dedupApplied: canDedup,
+                scoreStatus,
             });
 
         } catch (error) {
