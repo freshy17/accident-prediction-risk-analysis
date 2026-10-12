@@ -316,7 +316,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 await conn.commit();
             } catch (e) {
                 await conn.rollback();
-                throw e;   //ส่งต่อให้ catch ด้านนอกตอบ error
+                throw e; //ส่งต่อให้ catch ด้านนอกตอบ error
             } finally {
                 conn.release();
             }
