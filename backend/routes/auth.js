@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; 
 const PYTHON_CMD = process.env.PYTHON_CMD || 'python';
-// ปรับ path ให้ตรงกับที่เก็บ clean_admin.py จริง 
+//ปรับ path ให้ตรงกับที่เก็บ clean_admin.py จริง 
 const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'clean_admin.py');
 const SCORE_SCRIPT = process.env.SCORE_SCRIPT ||
@@ -122,16 +122,16 @@ router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
     const safeRole = ALLOWED_ROLES.includes(role) ? role : 'editor';
 
     try {
-        // เช็คว่ามี username นี้ในระบบหรือยัง
+        //เช็คว่ามี username นี้ในระบบหรือยัง
         const [existing] = await db.query('SELECT user_id FROM users WHERE username = ?', [username]);
         if (existing.length > 0) {
             return res.status(400).json({ success: false, message: 'ชื่อผู้ใช้นี้มีใช้งานในระบบแล้ว' });
         }
 
-        // เข้ารหัสรหัสผ่านก่อนบันทึก
+        //เข้ารหัสรหัสผ่านก่อนบันทึก
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // บันทึกลงตาราง users (กำหนด role เป็น admin หรือค่าที่ส่งมา)
+        //บันทึกลงตาราง users (กำหนด role เป็น admin หรือค่าที่ส่งมา)
         await db.query(
             'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
             [username, hashedPassword, safeRole]
@@ -183,7 +183,7 @@ router.post('/add-data', verifyToken, requireAdmin,
             try {
                 cleanStats = JSON.parse(fs.readFileSync(`${outputPath}.stats.json`, 'utf8'));
             } catch (e) {
-                // ไม่มีไฟล์สถิติก็ข้ามไป ไม่ให้การอัปโหลดล้มเหลว
+                //ไม่มีไฟล์สถิติก็ข้ามไป ไม่ให้การอัปโหลดล้มเหลว
             }
 
             if (records.length === 0) {
@@ -205,7 +205,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                     if (code) {
                         r.province_code = code;
                     } else {
-                        r.province_code = '';   // บันทึกเป็น NULL
+                        r.province_code = '';   //บันทึกเป็น NULL
                         const raw = String(r['จังหวัด'] ?? '').trim();
                         if (raw && raw !== 'ไม่ระบุ') unmatchedProvinces.add(raw);
                     }
@@ -271,12 +271,12 @@ router.post('/add-data', verifyToken, requireAdmin,
             if (canDedup) {
                 const keyOf = (r) => DEDUP_KEYS.map(k => {
                     const v = r[k];
-                    // ตัวเลขเทียบเป็นตัวเลข กัน 18.66476 กับ 18.664760 ไม่ตรงกัน
+                    //ตัวเลขเทียบเป็นตัวเลข กัน 18.66476 กับ 18.664760 ไม่ตรงกัน
                     return (['latitude', 'longitude', 'year', 'month', 'day', 'hour'].includes(k) && v !== '')
                         ? String(Number(v)) : String(v ?? '').trim();
                 }).join('|');
 
-                // 1) ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
+                //1) ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
                 const seen = new Set();
                 const uniqueInFile = [];
                 for (const r of records) {
@@ -284,7 +284,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                     if (!seen.has(k)) { seen.add(k); uniqueInFile.push(r); }
                 }
 
-                // 2) ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
+                //2) ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
                 const years = [...new Set(uniqueInFile.map(r => Number(r.year)).filter(Number.isFinite))];
                 const existing = new Set();
                 if (years.length > 0) {
@@ -316,7 +316,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 await conn.commit();
             } catch (e) {
                 await conn.rollback();
-                throw e;   // ส่งต่อให้ catch ด้านนอกตอบ error
+                throw e;   //ส่งต่อให้ catch ด้านนอกตอบ error
             } finally {
                 conn.release();
             }

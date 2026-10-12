@@ -28,7 +28,7 @@ function AdminUpload() {
         e.preventDefault();
         if (loading) return; //กันการกดซ้ำระหว่างรอ
 
-        const form = e.currentTarget; // เก็บไว้ก่อน await เพราะหลัง await currentTarget จะเป็น null
+        const form = e.currentTarget; //เก็บไว้ก่อน await เพราะหลัง await currentTarget จะเป็น null
         clearAlerts();
 
         if(!file) {
@@ -57,7 +57,7 @@ function AdminUpload() {
 
         setLoading(true);
         try {
-            // ไม่ต้องตั้ง Content-Type เอง ให้ axios/browser ใส่ boundary ให้
+            //ไม่ต้องตั้ง Content-Type เอง ให้ axios/browser ใส่ boundary ให้
             const response = await axios.post(`${API_URL}/api/admin/add-data`, data, {
                 headers: { Authorization: `Bearer ${token}` }
             });

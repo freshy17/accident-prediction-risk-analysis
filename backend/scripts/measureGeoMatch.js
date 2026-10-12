@@ -6,13 +6,13 @@ const SAMPLE_SIZE = parseInt(process.argv[2], 10) || 5000;
 
 (async () => {
     try {
-        // 1) โหลดตำบลทั้งหมดสร้างดัชนี (เหมือนที่ใช้ตอนอัปโหลด)
+        //1) โหลดตำบลทั้งหมดสร้างดัชนี (เหมือนที่ใช้ตอนอัปโหลด)
         const [subRows] = await db.query(
             'SELECT code, name_in_thai, latitude, longitude FROM subdistricts'
         );
         const subIndex = buildSubdistrictIndex(subRows);
 
-        // 2) สุ่มอุบัติเหตุเก่าที่มีรหัสและพิกัดครบ
+        //2) สุ่มอุบัติเหตุเก่าที่มีรหัสและพิกัดครบ
         const [rows] = await db.query(
             `SELECT province_code, district_code, subdistrict_code, latitude, longitude, year
              FROM accidents
@@ -38,7 +38,7 @@ const SAMPLE_SIZE = parseInt(process.argv[2], 10) || 5000;
             distances.push(hit.distanceKm);
             if (hit.distanceKm > 50) far50 += 1;
 
-            // เทียบแบบตัวเลข กันปัญหาชนิดข้อมูล (string/double)
+            //เทียบแบบตัวเลข กันปัญหาชนิดข้อมูล (string/double)
             const trueDist = Number(r.district_code);
             const trueSub = Number(r.subdistrict_code);
 

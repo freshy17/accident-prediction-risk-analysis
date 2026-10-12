@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
-// GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
+//GET: /api/summaries (ภาพรวมการ์ดสรุปตัวเลขต่างๆ)
 router.get('/', async (req, res) => {
     const { province_code, time_period, day_type, year } = req.query;
 
@@ -73,15 +73,6 @@ router.get('/', async (req, res) => {
 
         const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
-        //ดึงข้อมูลผลรวมจำนวนอุบัติเหตุ, ผู้เสียชีวิต, ผู้บาดเจ็บ ทัังหมด
-        // const mainSql = `
-        //     SELECT  
-        //         COALESCE(SUM(total_accidents), 0) AS total_accidents,
-        //         COALESCE(SUM(total_deaths), 0) AS total_deaths,
-        //         COALESCE(SUM(total_injuries), 0) AS total_injuries
-        //     FROM summaries
-        //     ${whereClause}
-        // `;
         const mainSql = `
             SELECT  
                 COUNT(*) AS total_accidents,
@@ -91,15 +82,6 @@ router.get('/', async (req, res) => {
             ${whereClause}
         `;
 
-        //ดึงข้อมูลช่วงเวลาที่เสี่ยงที่สุด
-        // const peakTimeSql = `
-        //     SELECT time_period, SUM(total_accidents) AS total
-        //     FROM summaries
-        //     ${whereClause}
-        //     GROUP BY time_period
-        //     ORDER BY total DESC
-        //     LIMIT 1
-        //     `;
         const peakTimeSql = `
             SELECT time_period, COUNT(*) AS total
             FROM accidents
@@ -153,11 +135,6 @@ router.get('/top10', async (req, res) => {
 
         if (province_code) {
             //ถ้าเลือกจังหวัด ให้ดึง Top 10 อำเภอของจังหวัดนั้น
-            // sql = `
-            //     SELECT d.dis_name_th AS name, SUM(s.total_accidents) AS total
-            //     FROM summaries s
-            //     JOIN districts d ON s.district_code = d.district_code
-            // `;
             sql = `
                 SELECT d.dis_name_th AS name, COUNT(*) AS total
                 FROM accidents s
@@ -168,11 +145,6 @@ router.get('/top10', async (req, res) => {
             params.push(province_code);
         } else {
             //ถ้าไม่เลือกจังหวัด ให้ดึง Top 10 จังหวัดของประเทศ
-            // sql = `
-            //     SELECT p.pro_name_th AS name, SUM(s.total_accidents) AS total
-            //     FROM summaries s
-            //     JOIN provinces p ON s.province_code = p.province_code
-            // `;
             sql = `
                 SELECT p.pro_name_th AS name, COUNT(*) AS total
                 FROM accidents s
@@ -213,16 +185,6 @@ router.get('/compare', async (req, res) => {
         let conditions = [];
 
         if (province_code) {
-            //เลือกจังหวัด
-            // sql = `
-            //     SELECT
-            //         d.dis_name_th AS name,
-            //         SUM(CASE WHEN s.day_type IN ('normal_day', 'weekend') THEN s.total_accidents ELSE 0 END) AS normal,
-            //         SUM(CASE WHEN s.day_type = 'new_year' THEN s.total_accidents ELSE 0 END) AS newYear,
-            //         SUM(CASE WHEN s.day_type = 'songkran' THEN s.total_accidents ELSE 0 END) AS songkran
-            //     FROM summaries s
-            //     JOIN districts d ON s.district_code = d.district_code
-            // `;
             sql = `
                 SELECT
                     d.dis_name_th AS name,
@@ -235,22 +197,6 @@ router.get('/compare', async (req, res) => {
             conditions.push('s.province_code = ?');
             params.push(province_code);
         } else {
-            //ไม่ได้เลือกจังหวัด
-            // sql = `
-            //     SELECT
-            //         CASE 
-            //             WHEN CAST(s.province_code AS UNSIGNED) IN (10, 11, 12, 13, 14, 73, 74) THEN 'กทม. และปริมณฑล'
-            //             WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 50 AND 58 
-            //               OR CAST(s.province_code AS UNSIGNED) BETWEEN 63 AND 67 THEN 'ภาคเหนือ'
-            //             WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 30 AND 49 THEN 'ภาคตะวันออกเฉียงเหนือ'
-            //             WHEN CAST(s.province_code AS UNSIGNED) BETWEEN 80 AND 96 THEN 'ภาคใต้'
-            //             ELSE 'ภาคกลาง'
-            //         END AS name,
-            //         SUM(CASE WHEN s.day_type IN ('normal_day', 'weekend') THEN s.total_accidents ELSE 0 END) AS normal,
-            //         SUM(CASE WHEN s.day_type = 'new_year' THEN s.total_accidents ELSE 0 END) AS newYear,
-            //         SUM(CASE WHEN s.day_type = 'songkran' THEN s.total_accidents ELSE 0 END) AS songkran
-            //     FROM summaries s
-            // `;
             sql = `
                 SELECT
                     CASE 
@@ -293,8 +239,7 @@ router.get('/compare', async (req, res) => {
 //GET: /api/summaries/years (เพื่อดึงปีทั้งหมดที่มีใน Database ไว้ใส่ใน Dropdown)
 router.get('/years', async (req, res) => {
     try {
-        // const [rows] = await db.query('SELECT DISTINCT year FROM summaries ORDER BY year DESC');
-         const [rows] = await db.query('SELECT DISTINCT year FROM accidents WHERE year IS NOT NULL ORDER BY year DESC');
+        const [rows] = await db.query('SELECT DISTINCT year FROM accidents WHERE year IS NOT NULL ORDER BY year DESC');
         //ส่งข้อมูลกลับมาเป็น array ex: [2025, 2024, 2023, 2022, 2021]
         const years = rows.map(item => item.year);
         res.json({ success: true, data: years });

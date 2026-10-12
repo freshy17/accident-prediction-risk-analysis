@@ -4,11 +4,11 @@ import sys
 import numpy as np
 import pandas as pd
 
-# ให้ print ภาษาไทยออกทาง pipe ได้บน Windows 
+#ให้ print ภาษาไทยออกทาง pipe ได้บน Windows 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-# ชื่อคอลัมน์ในไฟล์ที่ clean แล้ว -> ชื่อคอลัมน์ในตาราง accidents
+#ชื่อคอลัมน์ในไฟล์ที่ clean แล้ว -> ชื่อคอลัมน์ในตาราง accidents
 COLUMN_MAP = {
     'LATITUDE': 'latitude',
     'LONGITUDE': 'longitude',
@@ -23,7 +23,7 @@ COLUMN_MAP = {
     'รถคันที่1': 'vehicle',
     'สายทาง': 'road_name',
     'ชั่วโมง': 'hour',
-    # *** ตรวจชื่อจริงใน MySQL ด้วย (ในรูป Workbench ชื่อถูกตัดเป็น is_dangerouse_...) ***
+    #ตรวจชื่อจริงใน MySQL ด้วย (ในรูป Workbench ชื่อถูกตัดเป็น is_dangerouse_...)
     'is_dangerous_7days': 'is_dangerouse_7days',
 }
 
@@ -38,7 +38,7 @@ RENAME_2026 = {
 
 REQUIRED_COLS = ['ผู้เสียชีวิต', 'ผู้บาดเจ็บสาหัส']
 
-# ฟังก์ชันจาก notebook (clean_admin.ipynb)
+#ฟังก์ชันจาก notebook (clean_admin.ipynb)
 def parse_mixed_dates(val):
     try:
         num = float(val)
@@ -111,7 +111,7 @@ def process_cleansing_pipeline(df, stats=None):
     df = df.drop_duplicates()
     stats['duplicates'] = n1 - len(df)
 
-    if df.empty:  # ไม่เหลือแถวที่พิกัดถูกต้อง
+    if df.empty:  #ไม่เหลือแถวที่พิกัดถูกต้อง
         return df
 
     numeric_cols = [
@@ -119,7 +119,7 @@ def process_cleansing_pipeline(df, stats=None):
     ]
     for col in numeric_cols:
         if col in df.columns:
-            # to_numeric ก่อน กันกรณีมีข้อความปนในคอลัมน์ตัวเลข
+            #to_numeric ก่อน กันกรณีมีข้อความปนในคอลัมน์ตัวเลข
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
     text_cols = ['บริเวณที่เกิดเหตุ', 'มูลเหตุสันนิษฐาน', 'ลักษณะการเกิดเหตุ', 'สภาพอากาศ', 'จังหวัด', 'รถคันที่1', 'สายทาง']
@@ -185,7 +185,7 @@ def process_cleansing_pipeline(df, stats=None):
     df_cleaned = df.drop(columns=[col for col in drop_cols if col in df.columns])
     return df_cleaned
 
-# ส่วนเพิ่มใหม่: แปลงให้เข้ากับตาราง accidents
+#ส่วนเพิ่มใหม่: แปลงให้เข้ากับตาราง accidents
 def to_db_schema(df):
     df = df.rename(columns=COLUMN_MAP)
 
@@ -219,6 +219,21 @@ if __name__ == "__main__":
 
         stats = {}
         cleaned_df = to_db_schema(process_cleansing_pipeline(raw_df, stats))
+
+        #จับคู่พิกัดกับขอบเขตตำบล/อำเภอจริง
+        #ถ้าพังจะไม่มีคอลัมน์เหล่านี้ แล้ว auth.js กลับไปใช้ geoMatch เหมือนเดิม
+        if not cleaned_df.empty and 'latitude' in cleaned_df.columns:
+            try:
+                from collections import Counter
+                from geo_assign import GeoAssigner
+                geo = GeoAssigner().assign(cleaned_df['latitude'].values,
+                                           cleaned_df['longitude'].values)
+                cleaned_df['subdistrict_code'] = geo['subdistrict_code']
+                cleaned_df['district_code'] = geo['district_code']
+                cleaned_df['tambon'] = geo['tambon']
+                stats['geo'] = dict(Counter(geo['geo_method']))
+            except Exception as e:
+                stats['geo_error'] = str(e)
         cleaned_df.to_csv(output_path, index=False, encoding="utf-8-sig")
         with open(output_path + ".stats.json", "w", encoding="utf-8") as f:
             json.dump(stats, f)

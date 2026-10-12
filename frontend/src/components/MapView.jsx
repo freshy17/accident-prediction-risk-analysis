@@ -47,13 +47,13 @@ function HeatmapLayer({ points }) {
     if (heatArray.length === 0) return;
 
     const heatLayer = L.heatLayer(heatArray, {
-      radius: 12, // รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
-      blur: 7, // ระดับความฟุ้งเบลอของขอบสี     
+      radius: 12, //รัศมีความกระจายของสีในแต่ละจุด (พิกเซล)
+      blur: 7, //ระดับความฟุ้งเบลอของขอบสี     
       maxZoom: 12, 
       max: 50.0,      
       minOpacity: 0.4,
       gradient: { 0.3: "blue", 0.5: "lime", 0.7: "yellow", 1.0: "red" },
-    }).addTo(map); // สั่งให้ Layer นี้ไปวางแปะบนแผนที่จริง
+    }).addTo(map); //สั่งให้ Layer นี้ไปวางแปะบนแผนที่จริง
 
     return () => {
       map.removeLayer(heatLayer);
@@ -72,7 +72,7 @@ function MapController({ hotspots, hasSelectedProvince }) {
       map.invalidateSize();
 
       if (!hotspots || hotspots.length === 0) {
-        // ถ้าไม่มีข้อมูลให้กลับมาที่กึ่งกลางประเทศไทย
+        //ถ้าไม่มีข้อมูลให้กลับมาที่กึ่งกลางประเทศไทย
         map.flyTo(THAILAND_CENTER, 5, {
           duration: 1.5, //ระยะเวลาของการเคลื่อนย้ายจุด
           easeLinearity: 0.25, //ช่วยเรื่องความเคลื่อนไหวที่สมูท พุ่งด้วยความเร็วแล้วค่อยๆเบรกช้าเมื่อใกล้ถึงจุดหมาย
@@ -82,7 +82,7 @@ function MapController({ hotspots, hasSelectedProvince }) {
       }
 
       if (hasSelectedProvince) {
-        // รวบรวมพิกัดของ lat/lng ทั้งหมดที่มีอยู่จริงในจังหวัดนั้น
+        //รวบรวมพิกัดของ lat/lng ทั้งหมดที่มีอยู่จริงในจังหวัดนั้น
         const validBounds = hotspots
 
           .map((item) => {
@@ -94,7 +94,7 @@ function MapController({ hotspots, hasSelectedProvince }) {
           .filter(Boolean);
 
         if (validBounds.length > 0) {
-          // คำนวณขอบเขตทุกอำเภอ แล้วให้ flyToBounds เพื่อย้ายแผนที่ไปศูนย์กลางของจังหวัดนั้น
+          //คำนวณขอบเขตทุกอำเภอ แล้วให้ flyToBounds เพื่อย้ายแผนที่ไปศูนย์กลางของจังหวัดนั้น
           const bounds = L.latLngBounds(validBounds);
 
           //ซูมเจาะจงไปที่ขอบเขตของจังหวัดนั้นๆ
@@ -153,7 +153,6 @@ function MapView({ filters }) {
       const data = await res.json();
 
       if (data.success && data.data && data.data.length > 0) {
-        // setHotspots(data.data);
 
         let rawData = data.data;
 
@@ -167,8 +166,6 @@ function MapView({ filters }) {
             return (
               pCode === targetProv ||
               (pName !== "" && (pName.includes(targetProv) || targetProv.includes(pName)))
-              // pName.includes(targetProv) ||
-              // targetProv.includes(pName)
             );
           });
         }
@@ -186,21 +183,7 @@ function MapView({ filters }) {
     }
   };
 
-  //กำหนดสีและคำอธิบายตามระดับความเสี่ยง
-  // const getRiskInfo = (score, level) => {
-  //   const numScore = Number(score) || 0;
-
-  //   if (numScore >= 60) {
-  //     return { color: "#dc2626", label: "สูง", radius: 14 };
-  //   }
-
-  //   if (numScore >= 30) {
-  //     return { color: "#f97316", label: "ปานกลาง", radius: 11 };
-  //   }
-
-  //   return { color: "#22c55e", label: "ต่ำ", radius: 8 };
-  // };
-    //กำหนดสีและคำอธิบายตามระดับความเสี่ยง (ไม่มีคะแนน = สีเทา)
+  //กำหนดสีและคำอธิบายตามระดับความเสี่ยง (ไม่มีคะแนน = สีเทา)
   const getRiskInfo = (score) => {
     if (score === null || score === undefined || score === "") {
       return { color: "#9ca3af", label: "ยังไม่มีคะแนน", radius: 8 };
@@ -270,12 +253,7 @@ function MapView({ filters }) {
               if (isNaN(lat) || isNaN(lng)) return null;
 
               const totalAccidents = Number(item.total_accidents || 0);
-              // const riskScore = Number(item.risk_score || 0);
-              // const riskInfo = getRiskInfo(riskScore, item.risk_level);
-
-              // console.log("Map item:", item);
               const riskInfo = getRiskInfo(item.risk_score);
-
               const districtName =
                 item.district_name || item.dis_name_th || "ไม่ระบุอำเภอ";
 
@@ -308,9 +286,7 @@ function MapView({ filters }) {
                         </div>
 
                         <div className="popup-row">
-                          {/* <span className="popup-label">ระดับความเสี่ยง:</span> */}
                           <span className="popup-label">ระดับความเสี่ยงจากสถิติ:</span>
-
                           <strong
                             className="popup-value"
                             style={{ color: riskInfo.color }}
