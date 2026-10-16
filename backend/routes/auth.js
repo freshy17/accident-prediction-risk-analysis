@@ -9,7 +9,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const db = require('../config/db');
-const { buildSubdistrictIndex, nearestSubdistrict } = require('./geoMatch');
 
 const execFileAsync = promisify(execFile);
 const router = express.Router();
@@ -22,6 +21,8 @@ const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'clean_admin.py');
 const SCORE_SCRIPT = process.env.SCORE_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'score_summaries.py');
+const GEO_SCRIPT = process.env.GEO_SCRIPT ||
+    path.join(__dirname, '..', '..', 'data_pipeline', 'geo_assign.py');
 
 const PROVINCE_ALIAS = {
     'อยุธยา': 'พระนครศรีอยุธยา',
@@ -212,30 +213,40 @@ router.post('/add-data', verifyToken, requireAdmin,
                 }
             }
 
-            //เติมรหัสอำเภอ/ตำบล/ชื่อตำบล จากพิกัด (ตำบลที่ใกล้ที่สุดในจังหวัดเดียวกัน)
-            //ใช้เฉพาะเมื่อไฟล์ไม่มี subdistrict_code มาให้ และมีพิกัดกับรหัสจังหวัดแล้ว
-            let geoMatched = 0;
-            let geoFar = 0;
-            const GEO_FAR_KM = 50;
-            if ('province_code' in records[0] && 'latitude' in records[0] && 'longitude' in records[0]
+            //เติมรหัสอำเภอ/ตำบล/ชื่อตำบล จากพิกัดด้วย polygon (point-in-polygon ผ่าน geo_assign.py)
+            //ใช้เฉพาะเมื่อไฟล์ไม่มี subdistrict_code มาให้ และมีพิกัดครบ
+            //ไม่ต้องใช้ province_code ในการหา เพราะ polygon บอกพื้นที่จากพิกัดโดยตรง
+            let geoMatched = 0;   //แถวที่ได้รหัสตำบลทั้งหมด (polygon + nearest)
+            let geoFar = 0;       //แถวที่พิกัดไม่ตกใน polygon ตำบลใด ต้องใช้ตำบลที่ใกล้ที่สุด (ไม่เกิน ~5 กม.)
+            let geoDistrictOnly = 0; //ได้แค่รหัสอำเภอ
+            let geoUnmatched = 0; //ไม่ได้อะไรเลย
+            if ('latitude' in records[0] && 'longitude' in records[0]
                 && !('subdistrict_code' in records[0])) {
-                const [subRows] = await db.query(
-                    'SELECT code, name_in_thai, latitude, longitude FROM subdistricts'
-                );
-                const subIndex = buildSubdistrictIndex(subRows);
-                for (const r of records) {
-                    const hit = nearestSubdistrict(subIndex, r.province_code, r.latitude, r.longitude);
-                    if (hit) {
-                        r.subdistrict_code = hit.subdistrict_code;
-                        r.district_code = hit.district_code;
-                        r.tambon = hit.tambon;
-                        geoMatched += 1;
-                        if (hit.distanceKm > GEO_FAR_KM) geoFar += 1;
-                    } else {
-                        r.subdistrict_code = '';
-                        r.district_code = '';
-                        r.tambon = '';
-                    }
+                const geoPath = `${inputPath}_geo.csv`;
+                try {
+                    await execFileAsync(PYTHON_CMD, [GEO_SCRIPT, outputPath, geoPath],
+                        { encoding: 'utf8', timeout: 120000 });
+                } catch (e) {
+                    const detail = String(e.stdout || e.stderr || e.message).trim();
+                    return res.status(422).json({ success: false, message: `จับคู่พื้นที่จากพิกัดไม่สำเร็จ: ${detail}` });
+                }
+
+                //ใช้ผลจาก geo script แทน records เดิม (คอลัมน์เดิมครบ + รหัสพื้นที่ใหม่)
+                const geoRecords = parse(fs.readFileSync(geoPath, 'utf8'),
+                    { columns: true, skip_empty_lines: true, bom: true });
+                fs.unlink(geoPath, () => {});
+
+                for (let i = 0; i < records.length; i++) {
+                    const g = geoRecords[i];
+                    const r = records[i];
+                    r.subdistrict_code = g.subdistrict_code;
+                    r.district_code = g.district_code;
+                    r.tambon = g.tambon;
+
+                    if (g.geo_method === 'polygon') geoMatched += 1;
+                    else if (g.geo_method === 'nearest') { geoMatched += 1; geoFar += 1; }
+                    else if (g.geo_method === 'district_only') geoDistrictOnly += 1;
+                    else geoUnmatched += 1;
                 }
             }
 
@@ -347,6 +358,8 @@ router.post('/add-data', verifyToken, requireAdmin,
                 unmatchedProvinces: [...unmatchedProvinces],
                 geoMatched,
                 geoFar,
+                geoDistrictOnly,
+                geoUnmatched,
                 rawRows: cleanStats.raw_rows ?? null,
                 dropped: {
                     badCoords: cleanStats.bad_coords ?? 0,
@@ -369,6 +382,7 @@ router.post('/add-data', verifyToken, requireAdmin,
             fs.unlink(inputPath, () => {});
             fs.unlink(outputPath, () => {});
             fs.unlink(`${outputPath}.stats.json`, () => {});
+            fs.unlink(`${inputPath}_geo.csv`, () => {});
         }
     }
 );
