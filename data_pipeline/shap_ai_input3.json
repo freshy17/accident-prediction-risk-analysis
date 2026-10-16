@@ -1,0 +1,54 @@
+{
+  "area": {
+    "province_code": "11",
+    "province_name": "สมุทรปราการ",
+    "district_code": "1105",
+    "district_name": "พระสมุทรเจดีย์",
+    "subdistrict_code": "110505",
+    "subdistrict_name": "ในคลองปลากด"
+  },
+  "time_period": "เช้า (08:00 - 11:59)",
+  "day_type": "new_year",
+  "risk_score": 28.62,
+  "risk_level": "ต่ำ",
+  "shap_base_value": 40.3724242955331,
+  "raw_prediction": 28.618516278498177,
+  "shap_factors": [
+    {
+      "feature": "district_code",
+      "value": "1105",
+      "shap_value": -10.037536,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "subdist_total_cases",
+      "value": 11,
+      "shap_value": -7.645123,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "province_code",
+      "value": "11",
+      "shap_value": 6.586714,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "day_type",
+      "value": "new_year",
+      "shap_value": -0.478698,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "subdistrict_code",
+      "value": "110505",
+      "shap_value": -0.134442,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "time_period",
+      "value": "เช้า (08:00 - 11:59)",
+      "shap_value": -0.044824,
+      "direction": "decreases_prediction"
+    }
+  ]
+}

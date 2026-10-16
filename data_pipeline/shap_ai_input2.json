@@ -1,0 +1,54 @@
+{
+  "area": {
+    "province_code": "19",
+    "province_name": "สระบุรี",
+    "district_code": "1910",
+    "district_name": "เสาไห้",
+    "subdistrict_code": "191007",
+    "subdistrict_name": "ท่าช้าง"
+  },
+  "time_period": "บ่าย (12:00 - 15:59)",
+  "day_type": "new_year",
+  "risk_score": 13.71,
+  "risk_level": "ต่ำ",
+  "shap_base_value": 40.3724242955331,
+  "raw_prediction": 13.710222465122616,
+  "shap_factors": [
+    {
+      "feature": "district_code",
+      "value": "1910",
+      "shap_value": -15.482516,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "subdist_total_cases",
+      "value": 6,
+      "shap_value": -10.403107,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "day_type",
+      "value": "new_year",
+      "shap_value": -0.435113,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "subdistrict_code",
+      "value": "191007",
+      "shap_value": -0.237857,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "province_code",
+      "value": "19",
+      "shap_value": -0.214599,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "time_period",
+      "value": "บ่าย (12:00 - 15:59)",
+      "shap_value": 0.11099,
+      "direction": "increases_prediction"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "area": {
+    "province_code": "22",
+    "province_name": "จันทบุรี",
+    "district_code": "2206",
+    "district_name": "แหลมสิงห์",
+    "subdistrict_code": "220604",
+    "subdistrict_name": "พลิ้ว"
+  },
+  "time_period": "บ่าย (12:00 - 15:59)",
+  "day_type": "normal_day",
+  "risk_score": 88.89,
+  "risk_level": "สูง",
+  "shap_base_value": 40.3724242955331,
+  "raw_prediction": 88.89279731335333,
+  "shap_factors": [
+    {
+      "feature": "district_code",
+      "value": "2206",
+      "shap_value": 30.079545,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "subdistrict_code",
+      "value": "220604",
+      "shap_value": 12.657613,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "province_code",
+      "value": "22",
+      "shap_value": 2.479492,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "subdist_total_cases",
+      "value": 21,
+      "shap_value": 1.919473,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "day_type",
+      "value": "normal_day",
+      "shap_value": 1.125506,
+      "direction": "increases_prediction"
+    },
+    {
+      "feature": "time_period",
+      "value": "บ่าย (12:00 - 15:59)",
+      "shap_value": 0.258743,
+      "direction": "increases_prediction"
+    }
+  ]
+}
