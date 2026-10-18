@@ -8,6 +8,15 @@ const DAY_TYPE_MAP = {
   'songkran': 'เทศกาลสงกรานต์'
 };
 
+const FEATURE_LABELS = {
+  province_code: 'จังหวัด',
+  district_code: 'อำเภอ',
+  subdistrict_code: 'ตำบล',
+  time_period: 'ช่วงเวลา',
+  day_type: 'ประเภทวัน',
+  subdist_total_cases: 'จำนวนอุบัติเหตุสะสมในตำบล',
+};
+
 function RiskPrediction() {
     const [options, setOptions] = useState({
         provinces: [],
@@ -127,6 +136,7 @@ function RiskPrediction() {
             if(!value) {
                 setSubdistricts([]);
             } else {
+                setLoadingSubdistricts(true);
                 try {
                     const subData = await getSubdistrictsByDistrictCode(value);
                     setSubdistricts(Array.isArray(subData) ? subData : []);
@@ -174,7 +184,7 @@ function RiskPrediction() {
             if (data.success) {
                 //แปลง shap_values จาก API ให้เข้ากับ UI 
                 const formattedShap = data.shap_values.map(item => ({
-                    label: item.feature,
+                    label: FEATURE_LABELS[item.feature] ?? item.feature, // ?? item.feature คือถ้ามีปัจจัยใหม่ที่ยังไม่ได้กำหนดไว้ ให้แสดงชื่อเดิมแทนที่จะเป็นค่าว่าง
                     value: item.value,
                     type: item.value >= 0 ? 'positive' : 'negative'
                 }));
