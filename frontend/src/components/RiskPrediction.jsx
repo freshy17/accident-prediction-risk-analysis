@@ -218,18 +218,25 @@ const fetchExplanation = async (data) => {
 
             if (data.success) {
                 //แปลง shap_values จาก API ให้เข้ากับ UI 
-                const formattedShap = data.shap_values.map(item => ({
-                    label: FEATURE_LABELS[item.feature] ?? item.feature, // ?? item.feature คือถ้ามีปัจจัยใหม่ที่ยังไม่ได้กำหนดไว้ ให้แสดงชื่อเดิมแทนที่จะเป็นค่าว่าง
-                    value: item.value,
-                    type: item.value >= 0 ? 'positive' : 'negative'
-                }));
-
-                let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจรในช่วงเวลาที่เลือก";
-                if (data.risk_level === 'High') {
-                    recText = "ระดับความเสี่ยงสูงมาก! ควรเพิ่มความระมัดระวังในการเดินทางสูงสุดในช่วงเวลาและประเภทวันที่เลือก พร้อมกวดขันวินัยจราจรและตรวจสอบจุดเสี่ยงในพื้นที่";
-                } else if (data.risk_level === 'Medium') {
-                    recText = "มีความเสี่ยงปานกลาง ควรเพิ่มความระมัดระวังเป็นพิเศษในการขับขี่ตามช่วงเวลาและประเภทวันที่เลือก เพื่อป้องกันอุบัติเหตุในพื้นที่";
-                }
+                const formattedShap = data.shap_values
+                    .map(item => ({
+                        label: FEATURE_LABELS[item.feature] ?? item.feature, // ?? item.feature คือถ้ามีปัจจัยใหม่ที่ยังไม่ได้กำหนดไว้ ให้แสดงชื่อเดิมแทนที่จะเป็นค่าว่าง
+                        value: item.value,
+                        type: item.value >= 0 ? 'positive' : 'negative'
+                    }))
+                    .sort((a, b) => {
+                        //สีแดง (บวก) ขึ้นก่อนสีเขียว (ลบ)
+                        if (a.type !== b.type) return a.type === 'positive' ? -1 : 1;
+                        //ในกลุ่มเดียวกัน เรียงตามขนาดค่าจากมากไปน้อย
+                        return Math.abs(b.value) - Math.abs(a.value);
+                    });
+                    
+                    let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจรในช่วงเวลาที่เลือก";
+                    if (data.risk_level === 'High') {
+                        recText = "ระดับความเสี่ยงสูงมาก! ควรเพิ่มความระมัดระวังในการเดินทางสูงสุดในช่วงเวลาและประเภทวันที่เลือก พร้อมกวดขันวินัยจราจรและตรวจสอบจุดเสี่ยงในพื้นที่";
+                    } else if (data.risk_level === 'Medium') {
+                        recText = "มีความเสี่ยงปานกลาง ควรเพิ่มความระมัดระวังเป็นพิเศษในการขับขี่ตามช่วงเวลาและประเภทวันที่เลือก เพื่อป้องกันอุบัติเหตุในพื้นที่";
+                    }
 
                 setResult({
                     score: data.risk_score,
