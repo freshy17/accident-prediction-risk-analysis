@@ -6,15 +6,27 @@ const path = require('path');
 
 const router = express.Router();
 
-//POST /api/explain
-//รับผลพยากรณ์ (ที่ frontend ได้จาก /api/predict) + ชื่อพื้นที่ แล้วให้ Gemini เขียนคำอธิบายภาษาไทย
-
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'explain_prompt.txt');
-let SYSTEM_PROMPT = null;
-try {
-    SYSTEM_PROMPT = fs.readFileSync(PROMPT_FILE, 'utf8').trim();
-} catch (e) {
-    console.error('[explain] อ่านไฟล์ prompt ไม่ได้:', PROMPT_FILE);
+
+// POST /api/explain
+// รับผลพยากรณ์ (ที่ frontend ได้จาก /api/predict) + ชื่อพื้นที่ แล้วให้ Gemini เขียนคำอธิบายภาษาไทย
+
+//อ่าน prompt ใหม่อัตโนมัติเมื่อไฟล์ถูกแก้ (ไม่ต้องรีสตาร์ท backend)
+let promptState = { mtime: 0, text: null, id: '' };
+function getPrompt() {
+    try {
+        const st = fs.statSync(PROMPT_FILE);
+        if (st.mtimeMs !== promptState.mtime) {
+            const text = fs.readFileSync(PROMPT_FILE, 'utf8').trim();
+            const id = crypto.createHash('sha1').update(text).digest('hex').slice(0, 8);
+            promptState = { mtime: st.mtimeMs, text, id };
+            console.log(`[explain] โหลด prompt แล้ว (${text.length} ตัวอักษร, id ${id})`);
+        }
+        return promptState;
+    } catch (e) {
+        console.error('[explain] อ่านไฟล์ prompt ไม่ได้:', PROMPT_FILE);
+        return null;
+    }
 }
 
 const FEATURES = ['province_code', 'district_code', 'subdistrict_code',
@@ -23,7 +35,7 @@ const LEVEL_TH = { High: 'สูง', Medium: 'ปานกลาง', Low: 'ต
 
 const str = (v, max = 100) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 
-// ตรวจและประกอบ JSON ที่จะส่งให้ Gemini (ไม่ส่งต่อข้อมูลดิบจากผู้ใช้ตรงๆ)
+//ตรวจและประกอบ JSON ที่จะส่งให้ Gemini (ไม่ส่งต่อข้อมูลดิบจากผู้ใช้ตรงๆ)
 function buildPayload(b) {
     const score = Number(b.risk_score);
     const level = LEVEL_TH[b.risk_level];
@@ -69,18 +81,18 @@ function buildPayload(b) {
     };
 }
 
-async function callGemini(payload) {
+async function callGemini(payload, systemPrompt) {
     const apiKey = process.env.GEMINI_API_KEY;
     const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
     const base = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
 
     const r = await axios.post(`${base}/models/${model}:generateContent`, {
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{
             role: 'user',
             parts: [{ text: 'ข้อมูลผลการประเมิน (JSON):\n' + JSON.stringify(payload, null, 2) }],
         }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.5, maxOutputTokens: 2048 },
     }, {
         headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
         timeout: 25000,
@@ -120,7 +132,8 @@ function cacheSet(key, text) {
 }
 
 router.post('/', async (req, res) => {
-    if (!process.env.GEMINI_API_KEY || !SYSTEM_PROMPT) {
+    const prompt = getPrompt();
+    if (!process.env.GEMINI_API_KEY || !prompt) {
         return res.status(503).json({ success: false, message: 'ยังไม่ได้ตั้งค่าระบบอธิบายผล' });
     }
 
@@ -129,7 +142,8 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' });
     }
 
-    const key = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+    //ใส่ id ของ prompt ในคีย์ cache ด้วย แก้ prompt แล้วผลเก่าจะไม่ถูกใช้ซ้ำ
+    const key = crypto.createHash('sha1').update(prompt.id + JSON.stringify(payload)).digest('hex');
 
     const cached = cacheGet(key);
     if (cached) return res.json({ success: true, explanation: cached, cached: true });
@@ -137,7 +151,7 @@ router.post('/', async (req, res) => {
     try {
         let p = inflight.get(key);
         if (!p) {
-            p = callGemini(payload).finally(() => inflight.delete(key));
+            p = callGemini(payload, prompt.text).finally(() => inflight.delete(key));
             inflight.set(key, p);
         }
         const text = await p;

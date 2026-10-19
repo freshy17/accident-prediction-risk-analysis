@@ -8,8 +8,6 @@ const DAY_TYPE_MAP = {
   'songkran': 'เทศกาลสงกรานต์'
 };
 
-const EXPLAIN_HEADINGS = ['สรุปผลการประเมิน', 'ปัจจัยที่มีผลต่อคะแนน', 'ข้อเสนอแนะในการป้องกัน', 'ข้อจำกัดของผลการประเมิน'];
-
 const FEATURE_LABELS = {
   province_code: 'จังหวัด',
   district_code: 'อำเภอ',
@@ -424,16 +422,15 @@ const fetchExplanation = async (data) => {
 
                             {/* Card 3: Recommendation */}
                             <div className="recommend-card">
-                                <h3 className="recommend-title">{explanation ? 'คำอธิบายผลการประเมิน' : 'ข้อเสนอแนะ'}</h3>
+                                <h3 className="recommend-title">ข้อเสนอแนะในการป้องกัน</h3>
                                 {explaining ? (
-                                    <p className="recommend-text">กำลังสร้างคำอธิบายจาก AI...</p>
+                                    <p className="recommend-text">กำลังสร้างข้อเสนอแนะจาก AI...</p>
                                 ) : explanation ? (
                                     <div className="recommend-text">
                                         {explanation.split('\n').map((line, i) => {
                                             const t = line.trim();
-                                            if (!t) return <div key={i} style={{ height: 8 }} />;
-                                            if (EXPLAIN_HEADINGS.includes(t)) return <div key={i} style={{ fontWeight: 700, marginTop: 8 }}>{t}</div>;
-                                            return <div key={i}>{t}</div>;
+                                            if (!t) return null;
+                                            return <div key={i} style={{ marginBottom: 6 }}>{t}</div>;
                                         })}
                                     </div>
                                 ) : (
