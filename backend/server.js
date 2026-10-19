@@ -30,6 +30,7 @@ app.use('/api/summaries', summariesRoutes);
 app.use('/api/filters', filterRoutes);
 app.use('/api/predict', require('./routes/predict'));
 app.use('/api/admin', authRoutes);
+app.use('/api/explain', require('./routes/explain'));
 
 //สั่งให้ server ทำงาน
 app.listen(PORT, () => {

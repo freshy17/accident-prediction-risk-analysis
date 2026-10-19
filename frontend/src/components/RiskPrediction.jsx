@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode } from "../api/apiService";
+import { useState, useEffect, useRef } from "react";
+import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode, getRiskExplanation } from "../api/apiService";
 
 const DAY_TYPE_MAP = {
   'normal_day': 'วันธรรมดา (จ.-ศ.)',
@@ -7,6 +7,8 @@ const DAY_TYPE_MAP = {
   'new_year': 'เทศกาลปีใหม่',
   'songkran': 'เทศกาลสงกรานต์'
 };
+
+const EXPLAIN_HEADINGS = ['สรุปผลการประเมิน', 'ปัจจัยที่มีผลต่อคะแนน', 'ข้อเสนอแนะในการป้องกัน', 'ข้อจำกัดของผลการประเมิน'];
 
 const FEATURE_LABELS = {
   province_code: 'จังหวัด',
@@ -42,6 +44,41 @@ function RiskPrediction() {
     });
 
     const [result, setResult] = useState(null);
+
+    const [explanation, setExplanation] = useState('');
+const [explaining, setExplaining] = useState(false);
+const explainReqId = useRef(0);
+
+const fetchExplanation = async (data) => {
+    const reqId = ++explainReqId.current;
+    setExplanation('');
+    setExplaining(true);
+    try {
+        const provinceName = options.provinces.find(p => String(p.province_code) === String(formData.province_code))?.pro_name_th;
+        const districtName = districts.find(d => String(d.district_code) === String(formData.district_code))?.dis_name_th;
+        const subdistrictName = subdistricts.find(s => String(s.subdistrict_code) === String(formData.subdistrict_code))?.sub_name_th;
+
+        const res = await getRiskExplanation({
+            province_code: formData.province_code,
+            province_name: provinceName,
+            district_code: formData.district_code,
+            district_name: districtName,
+            subdistrict_code: formData.subdistrict_code,
+            subdistrict_name: subdistrictName,
+            time_period: formData.timeRange,
+            day_type: formData.dayType,
+            subdist_total_cases: formData.subdist_total_cases,
+            risk_score: data.risk_score,
+            risk_level: data.risk_level,
+            shap_values: data.shap_values
+        });
+        if (reqId === explainReqId.current && res.success) setExplanation(res.explanation);
+    } catch (err) {
+        console.error("Explain failed:", err);
+    } finally {
+        if (reqId === explainReqId.current) setExplaining(false);
+    }
+};
 
     //โหลดตัวเลือกทั้งหมดครั้งเดียวตอนเปิดหน้าเว็บ
     useEffect(() => {
@@ -202,6 +239,7 @@ function RiskPrediction() {
                     shapeValues: formattedShap,
                     recommendation: recText
                 });
+                fetchExplanation(data);
             } else {
                 setError(data.message || "เกิดข้อผิดพลาดในการพยากรณ์");
             }
@@ -386,8 +424,21 @@ function RiskPrediction() {
 
                             {/* Card 3: Recommendation */}
                             <div className="recommend-card">
-                                <h3 className="recommend-title">ข้อเสนอแนะ</h3>
-                                <p className="recommend-text">{result.recommendation}</p>
+                                <h3 className="recommend-title">{explanation ? 'คำอธิบายผลการประเมิน' : 'ข้อเสนอแนะ'}</h3>
+                                {explaining ? (
+                                    <p className="recommend-text">กำลังสร้างคำอธิบายจาก AI...</p>
+                                ) : explanation ? (
+                                    <div className="recommend-text">
+                                        {explanation.split('\n').map((line, i) => {
+                                            const t = line.trim();
+                                            if (!t) return <div key={i} style={{ height: 8 }} />;
+                                            if (EXPLAIN_HEADINGS.includes(t)) return <div key={i} style={{ fontWeight: 700, marginTop: 8 }}>{t}</div>;
+                                            return <div key={i}>{t}</div>;
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="recommend-text">{result.recommendation}</p>
+                                )}
                             </div>
                         </>
                     ) : (

@@ -140,3 +140,9 @@ export const getSubdistrictsByDistrictCode = async (districtCode) => {
         throw error;
     }
 }
+
+//ขอคำอธิบายผลการพยากรณ์จาก AI (Gemini ผ่าน backend)
+export const getRiskExplanation = async (data) => {
+    const response = await axios.post(`${BASE_URL}/explain`, data, { timeout: 30000 });
+    return response.data;
+};
