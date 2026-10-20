@@ -27,6 +27,7 @@ COLUMN_MAP = {
     'is_dangerous_7days': 'is_dangerouse_7days',
 }
 
+# เปลี่ยนชื่อคอลัมน์ไฟล์ปี 2026 ให้ตรงกับชื่อมาตรฐาน
 RENAME_2026 = {
     'จำนวนผู้เสียชีวิต': 'ผู้เสียชีวิต',
     'จำนวนผู้บาดเจ็บสาหัส': 'ผู้บาดเจ็บสาหัส',
@@ -36,9 +37,11 @@ RENAME_2026 = {
     'หน่วยงาน': 'agency',
 }
 
+# คอลัมน์ที่จำเป็น
 REQUIRED_COLS = ['ผู้เสียชีวิต', 'ผู้บาดเจ็บสาหัส']
 
 #ฟังก์ชันจาก notebook (clean_admin.ipynb)
+#จัดการวันที่
 def parse_mixed_dates(val):
     try:
         num = float(val)
@@ -48,7 +51,7 @@ def parse_mixed_dates(val):
         pass
     return pd.to_datetime(val, dayfirst=True, errors='coerce')
 
-
+#จัดการเวลา
 def clean_time_str(val):
     if pd.isna(val):
         return val
@@ -60,7 +63,6 @@ def clean_time_str(val):
     except ValueError:
         pass
     return str(val).strip()
-
 
 def get_time_period(hour):
     if pd.isna(hour) or hour < 0:
@@ -105,13 +107,14 @@ def process_cleansing_pipeline(df, stats=None):
 
     n0 = len(df)
     df = df[valid_lat & valid_long].copy()
+    #กรองพิกัดให้เหลือเฉพาะ lat5-21,lon97-106(กรอบประเทศไทย)
     stats['bad_coords'] = n0 - len(df)
 
     n1 = len(df)
-    df = df.drop_duplicates()
+    df = df.drop_duplicates() #ลบแถวซ้ำ
     stats['duplicates'] = n1 - len(df)
 
-    if df.empty:  #ไม่เหลือแถวที่พิกัดถูกต้อง
+    if df.empty: #ไม่เหลือแถวที่พิกัดถูกต้อง
         return df
 
     numeric_cols = [
@@ -119,14 +122,18 @@ def process_cleansing_pipeline(df, stats=None):
     ]
     for col in numeric_cols:
         if col in df.columns:
-            #to_numeric ก่อน กันกรณีมีข้อความปนในคอลัมน์ตัวเลข
+            #แปลงเป็นตัวเลขก่อน กันกรณีมีข้อความปนในคอลัมน์ตัวเลข 
+            #to_numeric ให้เติม 0 กลายเป็น int
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
     text_cols = ['บริเวณที่เกิดเหตุ', 'มูลเหตุสันนิษฐาน', 'ลักษณะการเกิดเหตุ', 'สภาพอากาศ', 'จังหวัด', 'รถคันที่1', 'สายทาง']
     for col in text_cols:
         if col in df.columns:
+            #ทำความสะอาดข้อความ
+            #เติมไม่ระบุ ให้ค่าว่าง, ตัดช่องว่าง
             df[col] = df[col].fillna('ไม่ระบุ').astype(str).str.strip()
 
+    #รวมคำสะกดต่างกัน
     if 'มูลเหตุสันนิษฐาน' in df.columns:
         df['มูลเหตุสันนิษฐาน'] = df['มูลเหตุสันนิษฐาน'].replace({
             "ขับขี่ย้อนศร": "ขับรถย้อนศร",
@@ -172,6 +179,7 @@ def process_cleansing_pipeline(df, stats=None):
         )
         df['is_dangerous_7days'] = ((df['is_new_year'] == 1) | (df['is_songkran'] == 1)).astype(int)
 
+    #ลบคอลัมน์ที่ไม่ใช้
     drop_cols = [
         'ACC_CODE', 'สายทางหน่วยงาน', 'KM', 'รหัสสายทาง',
         'วันที่เกิดเหตุ', 'เวลา', 'วันที่รายงาน', 'เวลาที่รายงาน',
@@ -221,16 +229,17 @@ if __name__ == "__main__":
         cleaned_df = to_db_schema(process_cleansing_pipeline(raw_df, stats))
 
         #จับคู่พิกัดกับขอบเขตตำบล/อำเภอจริง
-        #ถ้าพังจะไม่มีคอลัมน์เหล่านี้ แล้ว auth.js กลับไปใช้ geoMatch เหมือนเดิม
+        #ถ้าพังจะไม่มีคอลัมน์เหล่านี้ แล้ว auth.js จะเรียก geo_assign.py แยกอีกรอบเป็น fallback
         if not cleaned_df.empty and 'latitude' in cleaned_df.columns:
             try:
                 from collections import Counter
-                from geo_assign import GeoAssigner
+                from geo_assign import GeoAssigner, _code_str
                 geo = GeoAssigner().assign(cleaned_df['latitude'].values,
                                            cleaned_df['longitude'].values)
-                cleaned_df['subdistrict_code'] = geo['subdistrict_code']
-                cleaned_df['district_code'] = geo['district_code']
-                cleaned_df['tambon'] = geo['tambon']
+                cleaned_df['subdistrict_code'] = [_code_str(v) for v in geo['subdistrict_code']]
+                cleaned_df['district_code'] = [_code_str(v) for v in geo['district_code']]
+                cleaned_df['tambon'] = [t or '' for t in geo['tambon']]
+                cleaned_df['geo_method'] = geo['geo_method']
                 stats['geo'] = dict(Counter(geo['geo_method']))
             except Exception as e:
                 stats['geo_error'] = str(e)
