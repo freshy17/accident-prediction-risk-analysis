@@ -7,7 +7,7 @@ const DAY_TYPE_MAP = {
   'new_year': 'เทศกาลปีใหม่',
   'songkran': 'เทศกาลสงกรานต์'
 };
-
+ 
 const FEATURE_LABELS = {
   province_code: 'จังหวัด',
   district_code: 'อำเภอ',
