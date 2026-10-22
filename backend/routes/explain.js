@@ -8,8 +8,8 @@ const router = express.Router();
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'explain_prompt.txt');
 
-// POST /api/explain
-// รับผลพยากรณ์ (ที่ frontend ได้จาก /api/predict) + ชื่อพื้นที่ แล้วให้ Gemini เขียนคำอธิบายภาษาไทย
+//POST /api/explain
+//รับผลพยากรณ์ (ที่ frontend ได้จาก /api/predict) + ชื่อพื้นที่ แล้วให้ Gemini เขียนคำอธิบายภาษาไทย
 
 //อ่าน prompt ใหม่อัตโนมัติเมื่อไฟล์ถูกแก้ (ไม่ต้องรีสตาร์ท backend)
 let promptState = { mtime: 0, text: null, id: '' };
@@ -81,9 +81,11 @@ function buildPayload(b) {
     };
 }
 
-async function callGemini(payload, systemPrompt) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+
+async function callGeminiOnce(model, payload, systemPrompt) {
     const apiKey = process.env.GEMINI_API_KEY;
-    const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
     const base = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
 
     const r = await axios.post(`${base}/models/${model}:generateContent`, {
@@ -102,6 +104,34 @@ async function callGemini(payload, systemPrompt) {
     const text = parts.map((p) => p.text || '').join('').trim();
     if (!text) throw new Error('Gemini ตอบกลับว่างเปล่า');
     return cleanText(text);
+}
+
+//ลองโมเดลหลักก่อน (retry เมื่อ 429/5xx/timeout/ว่าง) แล้วค่อยสลับไปโมเดลสำรอง
+//ตั้งใน .env ได้: GEMINI_MODEL=... และ GEMINI_FALLBACK_MODEL=...
+async function callGemini(payload, systemPrompt) {
+    const models = [
+        process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+        process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash',
+    ].filter((m, i, a) => m && a.indexOf(m) === i);
+    const ATTEMPTS = 2;
+    let lastErr;
+
+    for (const model of models) {
+        for (let i = 1; i <= ATTEMPTS; i++) {
+            try {
+                return await callGeminiOnce(model, payload, systemPrompt);
+            } catch (e) {
+                lastErr = e;
+                const status = e.response?.status;
+                const msg = e.response?.data?.error?.message || e.message;
+                console.error(`[explain] ${model} ครั้งที่ ${i}/${ATTEMPTS} ล้ม (${status || 'no status'}): ${msg}`);
+                const retryable = !status || RETRYABLE.has(status) || /ว่างเปล่า/.test(e.message);
+                if (!retryable) break;            //เช่น 400/403 ลองซ้ำก็ไม่หาย ข้ามไปโมเดลถัดไป
+                if (i < ATTEMPTS) await sleep(1000 * i);
+            }
+        }
+    }
+    throw lastErr;
 }
 
 //กันกรณี AI ใส่ Markdown มาทั้งที่ห้ามไว้ (หน้าเว็บแสดงเป็นข้อความธรรมดา)
