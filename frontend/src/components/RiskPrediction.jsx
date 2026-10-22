@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode, getRiskExplanation } from "../api/apiService";
+import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode, getRiskExplanation, getRiskModels } from "../api/apiService";
 
 const DAY_TYPE_MAP = {
   'normal_day': 'วันธรรมดา (จ.-ศ.)',
@@ -15,6 +15,45 @@ const FEATURE_LABELS = {
   time_period: 'ช่วงเวลา',
   day_type: 'ประเภทวัน',
   subdist_total_cases: 'จำนวนอุบัติเหตุสะสมในตำบล',
+};
+
+//โมเดลหลักที่ใช้งานจริง (ค่าเริ่มต้นของ dropdown เลือกโมเดล)
+const DEFAULT_MODEL_ID = 'default';
+
+const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+//[2021, 2022, 2023] -> "2021-2023"
+const formatYears = (years) => {
+  if (!years || years.length === 0) return '-';
+  const sorted = [...years].sort((a, b) => a - b);
+  return sorted.length === 1 ? String(sorted[0]) : `${sorted[0]}-${sorted[sorted.length - 1]}`;
+};
+
+//"2026-10-22T11:56:33" -> "22 ต.ค. 2569 11:56"
+const formatModelTime = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+  if (!m) return '';
+  return `${Number(m[3])} ${THAI_MONTHS[Number(m[2]) - 1]} ${Number(m[1]) + 543} ${m[4]}:${m[5]}`;
+};
+
+//ชื่อที่แสดงใน dropdown
+const getModelLabel = (model) => {
+  if (!model || model.is_default) return 'โมเดลหลัก (v1)';
+  const time = formatModelTime(model.created_at);
+  return time ? `โมเดลทดลอง ${time}` : `โมเดลทดลอง ${model.id}`;
+};
+
+//รายละเอียดใต้ dropdown (ปีที่ใช้เทรน/ทดสอบ และค่าวัดผล) ให้ผู้ใช้เปรียบเทียบได้
+const getModelDetail = (model) => {
+  if (!model || model.is_default) return 'โมเดลที่ใช้งานจริงของระบบ';
+  const parts = [
+    `เทรนด้วยปี ${formatYears(model.train_years)}`,
+    `ทดสอบด้วยปี ${formatYears(model.test_years)}`,
+  ];
+  const metrics = model.metrics;
+  if (metrics && metrics.test_r2 != null) parts.push(`Test R² ${metrics.test_r2.toFixed(4)}`);
+  if (metrics && metrics.test_mae != null) parts.push(`MAE ${metrics.test_mae.toFixed(2)}`);
+  return parts.join(' · ');
 };
 
 function RiskPrediction() {
@@ -42,6 +81,10 @@ function RiskPrediction() {
     });
 
     const [result, setResult] = useState(null);
+
+    //รายการโมเดลที่เลือกได้ และโมเดลที่เลือกอยู่
+    const [models, setModels] = useState([]);
+    const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
 
     const [explanation, setExplanation] = useState('');
 const [explaining, setExplaining] = useState(false);
@@ -78,15 +121,29 @@ const fetchExplanation = async (data) => {
     }
 };
 
+    //โหลดรายการโมเดล (เรียกตอนเปิดหน้า และทุกครั้งที่กดเปิด dropdown เพื่อให้เห็นโมเดลที่เพิ่งรีเทรน/เพิ่งลบทันที)
+    const loadModels = async () => {
+        try {
+            const res = await getRiskModels();
+            if (res?.success && Array.isArray(res.models)) {
+                setModels(res.models);
+                //ถ้าโมเดลที่เลือกค้างไว้ถูกลบไปแล้ว ให้กลับไปใช้โมเดลหลัก
+                setSelectedModelId(prev => res.models.some(m => m.id === prev) ? prev : DEFAULT_MODEL_ID);
+            }
+        } catch (err) {
+            console.error("Error fetching models:", err);
+        }
+    };
+
     //โหลดตัวเลือกทั้งหมดครั้งเดียวตอนเปิดหน้าเว็บ
     useEffect(() => {
         const fetchInitialOptions = async () => {
             try {
                 const response = await getFilterOptions();
-                console.log("Filter Options Response:", response); 
-                
+                console.log("Filter Options Response:", response);
+
                 // ดึงข้อมูลจาก response เผื่อถูกครอบด้วย data อีกชั้น
-                const resultData = response?.data || response; 
+                const resultData = response?.data || response;
 
                 setOptions({
                     provinces: resultData?.provinces || [],
@@ -98,6 +155,7 @@ const fetchExplanation = async (data) => {
             }
         };
         fetchInitialOptions();
+        loadModels();
     }, []);
 
     //โหลดรายชื่ออำเภอทันทีที่เปืดหน้ามาแล้วมีจังหวัดเลือกค้างอยู่
@@ -211,13 +269,14 @@ const fetchExplanation = async (data) => {
                 subdistrict_code: formData.subdistrict_code,
                 timeRange: formData.timeRange,
                 dayType: formData.dayType,
-                subdist_total_cases: formData.subdist_total_cases
+                subdist_total_cases: formData.subdist_total_cases,
+                model_id: selectedModelId
             })
 
             const data = await getRiskPrediction(payload);
 
             if (data.success) {
-                //แปลง shap_values จาก API ให้เข้ากับ UI 
+                //แปลง shap_values จาก API ให้เข้ากับ UI
                 const formattedShap = data.shap_values
                     .map(item => ({
                         label: FEATURE_LABELS[item.feature] ?? item.feature, // ?? item.feature คือถ้ามีปัจจัยใหม่ที่ยังไม่ได้กำหนดไว้ ให้แสดงชื่อเดิมแทนที่จะเป็นค่าว่าง
@@ -230,7 +289,7 @@ const fetchExplanation = async (data) => {
                         //ในกลุ่มเดียวกัน เรียงตามขนาดค่าจากมากไปน้อย
                         return Math.abs(b.value) - Math.abs(a.value);
                     });
-                    
+
                     let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจรในช่วงเวลาที่เลือก";
                     if (data.risk_level === 'High') {
                         recText = "ระดับความเสี่ยงสูงมาก! ควรเพิ่มความระมัดระวังในการเดินทางสูงสุดในช่วงเวลาและประเภทวันที่เลือก พร้อมกวดขันวินัยจราจรและตรวจสอบจุดเสี่ยงในพื้นที่";
@@ -242,7 +301,9 @@ const fetchExplanation = async (data) => {
                     score: data.risk_score,
                     level: data.risk_level,
                     shapeValues: formattedShap,
-                    recommendation: recText
+                    recommendation: recText,
+                    //เก็บชื่อโมเดลที่ใช้ทำนายครั้งนี้ไว้แสดงในผลลัพธ์
+                    modelLabel: getModelLabel(models.find(m => m.id === selectedModelId))
                 });
                 fetchExplanation(data);
             } else {
@@ -250,7 +311,13 @@ const fetchExplanation = async (data) => {
             }
         } catch (error) {
             console.error("Predict failed:", error);
-            setError("ไม่สามารถเชื่อมต่อระบบพยากรณ์ได้ กรุณาลองใหม่อีกครั้ง")
+            if (error.response?.status === 404) {
+                //โมเดลที่เลือกไม่มีอยู่แล้ว (เช่นถูกลบไฟล์ไป) ให้โหลดรายการใหม่
+                setError("ไม่พบโมเดลที่เลือก (อาจถูกลบไปแล้ว) กรุณาเลือกโมเดลใหม่");
+                loadModels();
+            } else {
+                setError("ไม่สามารถเชื่อมต่อระบบพยากรณ์ได้ กรุณาลองใหม่อีกครั้ง")
+            }
         } finally {
             setLoading(false);
         }
@@ -263,10 +330,10 @@ const fetchExplanation = async (data) => {
                 {/* จังหวัด */}
                 <div className="form-group">
                     <label className="form-label">จังหวัด</label>
-                    <select 
-                        name="province_code" 
-                        value={formData.province_code} 
-                        onChange={handleChange} 
+                    <select
+                        name="province_code"
+                        value={formData.province_code}
+                        onChange={handleChange}
                         className="form-select"
                     >
                         <option value="">--ทั้งหมด--</option>
@@ -281,10 +348,10 @@ const fetchExplanation = async (data) => {
                 {/* อำเภอ */}
                 <div className="form-group">
                     <label className="form-label">อำเภอ</label>
-                    <select 
-                        name="district_code" 
-                        value={formData.district_code} 
-                        onChange={handleChange} 
+                    <select
+                        name="district_code"
+                        value={formData.district_code}
+                        onChange={handleChange}
                         className="form-select"
                         disabled={!formData.province_code || loadingDistricts}
                     >
@@ -310,10 +377,10 @@ const fetchExplanation = async (data) => {
                 {/* ตำบล (แล้วแนบจำนวนอุบัติเหตุในตำบลนั้นๆไปด้วย) */}
                  <div className="form-group">
                     <label className="form-label">ตำบล</label>
-                    <select 
-                        name="subdistrict_code" 
-                        value={formData.subdistrict_code} 
-                        onChange={handleChange} 
+                    <select
+                        name="subdistrict_code"
+                        value={formData.subdistrict_code}
+                        onChange={handleChange}
                         className="form-select"
                         disabled={!formData.district_code || loadingSubdistricts}
                     >
@@ -332,17 +399,17 @@ const fetchExplanation = async (data) => {
                             </>
                         ) : (
                             <option value="">-- ไม่มีข้อมูลตำบล --</option>
-                        )} 
+                        )}
                     </select>
                 </div>
 
                 {/* ช่วงเวลา */}
                <div className="form-group">
                     <label className="form-label">ช่วงเวลา</label>
-                    <select 
-                        name="timeRange" 
-                        value={formData.timeRange} 
-                        onChange={handleChange} 
+                    <select
+                        name="timeRange"
+                        value={formData.timeRange}
+                        onChange={handleChange}
                         className="form-select"
                     >
                         <option value="">-- เลือกช่วงเวลา --</option>
@@ -355,10 +422,10 @@ const fetchExplanation = async (data) => {
                 {/* ประเภทวัน */}
                 <div className="form-group">
                     <label className="form-label">ประเภทวัน</label>
-                    <select 
-                        name="dayType" 
-                        value={formData.dayType} 
-                        onChange={handleChange} 
+                    <select
+                        name="dayType"
+                        value={formData.dayType}
+                        onChange={handleChange}
                         className="form-select"
                     >
                         <option value="">-- เลือกประเภทวัน --</option>
@@ -368,6 +435,29 @@ const fetchExplanation = async (data) => {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                {/* เลือกโมเดลที่ใช้พยากรณ์ (โมเดลหลัก หรือโมเดลทดลองที่รีเทรนไว้) */}
+                <div className="form-group">
+                    <label className="form-label">โมเดลที่ใช้พยากรณ์</label>
+                    <select
+                        name="model_id"
+                        value={selectedModelId}
+                        onChange={(e) => setSelectedModelId(e.target.value)}
+                        onFocus={loadModels}
+                        className="form-select"
+                    >
+                        {models.length === 0 ? (
+                            <option value={DEFAULT_MODEL_ID}>{getModelLabel(null)}</option>
+                        ) : (
+                            models.map((m) => (
+                                <option key={m.id} value={m.id}>{getModelLabel(m)}</option>
+                            ))
+                        )}
+                    </select>
+                    <p className="model-detail">
+                        {getModelDetail(models.find(m => m.id === selectedModelId))}
+                    </p>
                 </div>
 
                 <button onClick={handlePredict} disabled={loading} className="btn-predict">
@@ -392,12 +482,15 @@ const fetchExplanation = async (data) => {
                                     <div>
                                         <span className="text-gray-600 text-sm">ระดับความเสี่ยง : </span>
                                             <span className={
-                                                result.level === 'High' ? 'risk-level-high' : 
+                                                result.level === 'High' ? 'risk-level-high' :
                                                 result.level === 'Medium' ? 'risk-level-medium' : 'risk-level-low'
                                             }>
                                                 {result.level}
                                             </span>
                                     </div>
+                                </div>
+                                <div className="result-model-note">
+                                    ผลจาก: {result.modelLabel}
                                 </div>
                             </div>
 
@@ -449,7 +542,7 @@ const fetchExplanation = async (data) => {
                         <div className="risk-score-card" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                         <h3>👈 เลือกเงื่อนไขปัจจัยทางด้านซ้ายแล้วกด "Risk Prediction" เพื่อประเมินความเสี่ยง</h3>
                     </div>
-                    )} 
+                    )}
                 </div>
         </div>
     );

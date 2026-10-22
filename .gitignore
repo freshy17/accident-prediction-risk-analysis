@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+#โมเดลทดลองที่สร้างจากปุ่มรีเทรน 
+data_pipeline/models/experimental/

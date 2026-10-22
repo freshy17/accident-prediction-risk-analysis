@@ -23,6 +23,8 @@ const SCORE_SCRIPT = process.env.SCORE_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'score_summaries.py');
 const GEO_SCRIPT = process.env.GEO_SCRIPT ||
     path.join(__dirname, '..', '..', 'data_pipeline', 'geo_assign.py');
+const RETRAIN_SCRIPT = process.env.RETRAIN_SCRIPT ||
+    path.join(__dirname, '..', '..', 'data_pipeline', 'retrain.py');
 
 const PROVINCE_ALIAS = {
     'อยุธยา': 'พระนครศรีอยุธยา',
@@ -287,7 +289,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                         ? String(Number(v)) : String(v ?? '').trim();
                 }).join('|');
 
-                //1) ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
+                //1)ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
                 const seen = new Set();
                 const uniqueInFile = [];
                 for (const r of records) {
@@ -295,7 +297,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                     if (!seen.has(k)) { seen.add(k); uniqueInFile.push(r); }
                 }
 
-                //2) ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
+                //2)ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
                 const years = [...new Set(uniqueInFile.map(r => Number(r.year)).filter(Number.isFinite))];
                 const existing = new Set();
                 if (years.length > 0) {
@@ -386,5 +388,79 @@ router.post('/add-data', verifyToken, requireAdmin,
         }
     }
 );
+
+//ทดลองรีเทรนโมเดล (เฉพาะแอดมิน) 
+//เทรนเบื้องหลัง ไม่ให้เทรนซ้อนกัน เก็บสถานะไว้ในหน่วยความจำ (หายเมื่อรีสตาร์ท backend)
+//สคริปต์ retrain.py บันทึกโมเดลเป็นไฟล์ทดลองแยกต่างหาก ไม่แทนโมเดลที่เว็บใช้งานจริง
+const RETRAIN_TIMEOUT_MS = 30 * 60 * 1000;
+const RETRAIN_RESULT_PREFIX = 'RETRAIN_RESULT_JSON:';
+let retrainState = { status: 'idle', startedAt: null, finishedAt: null, result: null, error: null };
+
+const publicRetrainState = () => ({
+    status: retrainState.status, //idle | running | done | failed
+    startedAt: retrainState.startedAt,
+    finishedAt: retrainState.finishedAt,
+    durationSec: retrainState.finishedAt
+        ? Math.round((retrainState.finishedAt - retrainState.startedAt) / 1000) : null,
+    result: retrainState.result,
+    error: retrainState.error
+});
+
+//กันรหัสผ่านฐานข้อมูลหลุดไปกับข้อความ error
+const scrubSecrets = (text) => {
+    const pw = process.env.DB_PASSWORD;
+    return pw ? text.split(pw).join('***') : text;
+};
+
+router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
+    if (retrainState.status === 'running') {
+        return res.status(409).json({
+            success: false,
+            message: 'กำลังเทรนอยู่ กรุณารอให้เสร็จก่อน',
+            ...publicRetrainState()
+        });
+    }
+
+    retrainState = { status: 'running', startedAt: Date.now(), finishedAt: null, result: null, error: null };
+
+    execFile(PYTHON_CMD, [RETRAIN_SCRIPT], {
+        cwd: path.dirname(RETRAIN_SCRIPT),
+        encoding: 'utf8',
+        timeout: RETRAIN_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    }, (err, stdout, stderr) => {
+        const finishedAt = Date.now();
+        const line = String(stdout || '').split(/\r?\n/).reverse()
+            .find(l => l.startsWith(RETRAIN_RESULT_PREFIX));
+
+        if (!err && line) {
+            try {
+                const result = JSON.parse(line.slice(RETRAIN_RESULT_PREFIX.length));
+                retrainState = { ...retrainState, status: 'done', finishedAt, result, error: null };
+                return;
+            } catch (e) {
+                //อ่านผลไม่ได้ ตกไปเป็น failed ด้านล่าง
+            }
+        }
+
+        let detail;
+        if (err && err.killed) {
+            detail = 'เทรนนานเกินกำหนด (30 นาที) ระบบยกเลิกงานแล้ว';
+        } else {
+            detail = String(stderr || stdout || (err && err.message) || '')
+                .trim().split(/\r?\n/).slice(-5).join('\n');
+        }
+        detail = scrubSecrets(detail).slice(-500) || 'เทรนไม่สำเร็จ';
+        console.error('retrain error:', detail);
+        retrainState = { ...retrainState, status: 'failed', finishedAt, result: null, error: detail };
+    });
+
+    res.status(202).json({ success: true, ...publicRetrainState() });
+});
+
+router.get('/retrain/status', verifyToken, requireAdmin, (req, res) => {
+    res.json({ success: true, ...publicRetrainState() });
+});
 
 module.exports = router;

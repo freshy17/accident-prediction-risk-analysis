@@ -46,9 +46,9 @@ export const getSummaryData = async (filters) => {
 export const getHotspotPoints = async (selectedYear, provinceCode) => {
     try {
         const response = await axios.get(`${BASE_URL}/hotspots`, {
-            params: { 
+            params: {
                 year: selectedYear,
-                province_code: provinceCode 
+                province_code: provinceCode
             }
         });
         return response.data;
@@ -90,15 +90,27 @@ export const getHolidayCompareData = async (selectedYear, provinceCode) => {
     }
 };
 
-//ดึงผลการพยากรณ์ความเสี่ยง (สำหรับหน้า Risk Prediction และ SHAP) 
+//ดึงผลการพยากรณ์ความเสี่ยง (สำหรับหน้า Risk Prediction และ SHAP)
 //POST เพื่อส่งข้อมูลไปคำนวณที่ Python
 export const getRiskPrediction = async (predictionData) => {
-    // predictionData รูปแบบ: { district_code, timeRange, dayType, weather }
+    // predictionData รูปแบบ: { province_code, district_code, subdistrict_code, timeRange, dayType, model_id }
+    // model_id ไม่บังคับ (ไม่ส่ง = ใช้โมเดลหลัก)
     try {
         const response = await axios.post(`${BASE_URL}/predict`, predictionData);
         return response.data;
     } catch (error) {
         console.error("Error in getRiskPrediction:", error);
+        throw error;
+    }
+};
+
+//ดึงรายการโมเดลที่เลือกใช้พยากรณ์ได้ (โมเดลหลัก + โมเดลทดลองที่รีเทรนไว้)
+export const getRiskModels = async () => {
+    try {
+        const response = await axios.get(`${BASE_URL}/predict/models`);
+        return response.data;
+    } catch (error) {
+        console.error("Error in getRiskModels:", error);
         throw error;
     }
 };
