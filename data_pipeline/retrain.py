@@ -17,10 +17,8 @@ from sklearn.metrics import (
     mean_squared_error,
 )
 
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, "..", "backend", ".env"))
-
 
 def build_db_url():
     url = os.getenv("DATABASE_URL")
@@ -35,20 +33,11 @@ def build_db_url():
     port = os.getenv("DB_PORT", "3306")
     return f"mysql+pymysql://{quote_plus(user)}:{password}@{host}:{port}/{name}?charset=utf8mb4"
 
-
 DB_URL = build_db_url()
 
 SOURCE_TABLE = "accidents"
 START_YEAR = 2021
 
-# ---------------------------------------------------------------
-# โหมดเทียบกับโมเดลหลัก (ใช้เฉพาะตอนสาธิต)
-#   python retrain.py --snapshot
-# หรือตั้งค่า environment variable RETRAIN_SOURCE=snapshot
-# อ่านจากตารางสำเนา train2021_2023 / test2024_2025 เหมือน new_train.ipynb
-# ใช้ได้เฉพาะปี 2021-2025 (ไม่รวม 2026)
-# โหมดปกติ (ไม่ใส่ flag) อ่านจากตาราง accidents เหมือนเดิมทุกอย่าง
-# ---------------------------------------------------------------
 SNAPSHOT_MODE = (
     "--snapshot" in sys.argv
     or os.getenv("RETRAIN_SOURCE", "").strip().lower() == "snapshot"
@@ -77,7 +66,6 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 engine = create_engine(DB_URL)
 
-
 def load_data_snapshot():
     train = pd.read_sql(f"SELECT * FROM `{SNAPSHOT_TRAIN_TABLE}`", engine)
     test = pd.read_sql(f"SELECT * FROM `{SNAPSHOT_TEST_TABLE}`", engine)
@@ -103,7 +91,6 @@ def load_data_snapshot():
         min(test_years),
         max(test_years),
     )
-
 
 def load_data():
     if SNAPSHOT_MODE:
