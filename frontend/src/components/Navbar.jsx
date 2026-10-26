@@ -11,9 +11,6 @@ const NavBar = ( { onAdminClick }) => {
                     <h1 className="navbar-title">
                         ระบบวิเคราะห์และพยากรณ์จุดเสี่ยงอุบัติเหตุทางถนนในประเทศไทย
                     </h1>
-                    <p className="navbar-subtitle"> 
-                        (ทางหลวงแผ่นดิน / ทางหลวงชนบท / และทางพิเศษ)
-                    </p>
                 </div>
             </div>
 
