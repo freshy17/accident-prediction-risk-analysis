@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB ต้องตรงกับ MAX_FILE_SIZE ฝั่ง backend
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // จำกัดไฟล์ 10 MB
 
 function AdminUpload() {
+    //อัปโหลดไฟล์
     const [file, setFile] = useState(null);
     const [message, setMessage] = useState('');
     const [warning, setWarning] = useState('');
@@ -30,6 +31,7 @@ function AdminUpload() {
         durationSec: d.durationSec ?? null
     });
 
+    //ถามสถานะจาก backend
     const fetchRetrainStatus = async () => {
         const headers = getAuthHeaders();
         if (!headers) return;
@@ -46,7 +48,7 @@ function AdminUpload() {
         }
     };
 
-    //เปิดหน้ามา ถามสถานะล่าสุดจาก backend (เผื่อกำลังเทรนอยู่ หรือมีผลรอบก่อน)
+    //เปิดหน้ามา ถามสถานะล่าสุดจาก backend 
     useEffect(() => {
         fetchRetrainStatus();
     }, []);
