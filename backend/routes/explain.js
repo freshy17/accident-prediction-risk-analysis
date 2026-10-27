@@ -1,11 +1,11 @@
 const express = require('express');
 const axios = require('axios');
-const crypto = require('crypto');
-const fs = require('fs');
+const crypto = require('crypto'); //สร้างค่า hash ของข้อความ
+const fs = require('fs'); //อ่านไฟล์
 const path = require('path');
-
 const router = express.Router();
 
+//ที่อยู่ไฟล์ prompt ที่แยกเป็นไฟล์ .txt ไว้
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'explain_prompt.txt');
 
 //POST /api/explain
@@ -42,6 +42,7 @@ function buildPayload(b) {
     if (!Number.isFinite(score) || !level) return null;
     if (!Array.isArray(b.shap_values) || b.shap_values.length === 0 || b.shap_values.length > 10) return null;
 
+    //สร้าง featureValue (ค่าของแต่ละปัจจัย)
     const featureValue = {
         province_code: str(b.province_code, 10),
         district_code: str(b.district_code, 10),
@@ -51,6 +52,7 @@ function buildPayload(b) {
         subdist_total_cases: Number(b.subdist_total_cases) || 0,
     };
 
+    //วนตรวจ SHAP ทีละตัว
     const factors = [];
     for (const f of b.shap_values) {
         const v = Number(f && f.value);
@@ -87,7 +89,7 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 async function callGeminiOnce(model, payload, systemPrompt) {
     const apiKey = process.env.GEMINI_API_KEY;
     const base = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
-
+ 
     const r = await axios.post(`${base}/models/${model}:generateContent`, {
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{
@@ -126,36 +128,41 @@ async function callGemini(payload, systemPrompt) {
                 const msg = e.response?.data?.error?.message || e.message;
                 console.error(`[explain] ${model} ครั้งที่ ${i}/${ATTEMPTS} ล้ม (${status || 'no status'}): ${msg}`);
                 const retryable = !status || RETRYABLE.has(status) || /ว่างเปล่า/.test(e.message);
-                if (!retryable) break;            //เช่น 400/403 ลองซ้ำก็ไม่หาย ข้ามไปโมเดลถัดไป
-                if (i < ATTEMPTS) await sleep(1000 * i);
+                if (!retryable) break; //เช่น 400/403 ลองซ้ำก็ไม่หาย ข้ามไปโมเดลถัดไป
+                if (i < ATTEMPTS) await sleep(1000 * i); //รอ 1 วิ
             }
         }
     }
-    throw lastErr;
+    //ถ้าลองทุกโมเดลแล้วไม่สำเร็จ
+    throw lastErr; 
 }
 
 //กันกรณี AI ใส่ Markdown มาทั้งที่ห้ามไว้ (หน้าเว็บแสดงเป็นข้อความธรรมดา)
 function cleanText(t) {
     return t
-        .replace(/\*\*/g, '')
-        .replace(/^#{1,6}\s*/gm, '')
-        .replace(/^\s*[-*]\s+/gm, '• ')
-        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\*\*/g, '') //ตัด ** (ตัวหนา)
+        .replace(/^#{1,6}\s*/gm, '') //ตัด # หัวข้อ ต้นบรรทัด
+        .replace(/^\s*[-*]\s+/gm, '• ') //เปลี่ยน - หรือ * หน้ารายการ เป็น •
+        .replace(/\n{3,}/g, '\n\n') //บรรทัดว่างเกิน 2 บรรทัด ลดเหลือ 1
         .trim();
 }
 
 //cache: ชุดข้อมูลเดิม (พื้นที่+เวลา+วัน+คะแนน+ค่า SHAP) ไม่ต้องเรียก Gemini ซ้ำ
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const CACHE_MAX = 500;
-const cache = new Map();      //key -> { text, at }
-const inflight = new Map();   //key -> Promise (กันเรียกซ้ำพร้อมกัน)
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; //24 ชม.
+const CACHE_MAX = 500; 
+const cache = new Map(); //key -> { text, at }
+const inflight = new Map(); //key -> Promise (กันเรียกซ้ำพร้อมกัน)
+//inflight คำตอบที่ กำลังรอ (คนหลายคนถามเรื่องเดียวกันพร้อมกัน เรียกแค่ครั้งเดียว)
 
+//เจอแต่เก่าเกิน 24 ชม. → ลบทิ้งแล้วคืน null, เจอและยังสด → คืนข้อความ
 function cacheGet(key) {
     const hit = cache.get(key);
     if (!hit) return null;
     if (Date.now() - hit.at > CACHE_TTL_MS) { cache.delete(key); return null; }
     return hit.text;
 }
+
+//ถ้าเต็ม500รายการ ลบตัวเก่าที่สุดก่อน
 function cacheSet(key, text) {
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
     cache.set(key, { text, at: Date.now() });
@@ -175,20 +182,21 @@ router.post('/', async (req, res) => {
     //ใส่ id ของ prompt ในคีย์ cache ด้วย แก้ prompt แล้วผลเก่าจะไม่ถูกใช้ซ้ำ
     const key = crypto.createHash('sha1').update(prompt.id + JSON.stringify(payload)).digest('hex');
 
+    //เจอในแคชส่งกลับทันที
     const cached = cacheGet(key);
     if (cached) return res.json({ success: true, explanation: cached, cached: true });
 
     try {
-        let p = inflight.get(key);
+        let p = inflight.get(key); //อ่าน
         if (!p) {
             p = callGemini(payload, prompt.text).finally(() => inflight.delete(key));
-            inflight.set(key, p);
+            inflight.set(key, p); //เขียน
         }
         const text = await p;
         cacheSet(key, text);
         res.json({ success: true, explanation: text, cached: false });
     } catch (e) {
-        //ไม่ log header/key เด็ดขาด
+        //ไม่ log header/key เด็ดขาด เพราะ error ของ axios มี header ที่มี API key อยู่
         const status = e.response?.status;
         const msg = e.response?.data?.error?.message || e.message;
         console.error(`[explain] Gemini error (${status || 'no status'}):`, msg);
