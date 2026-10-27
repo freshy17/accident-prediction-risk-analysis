@@ -70,7 +70,7 @@ function RiskPrediction() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-
+    //ค่าที่ผู้ใช้เลือกในฟอร์ม  
     const [formData, setFormData] = useState({
         province_code: '',
         district_code: '',
@@ -85,10 +85,11 @@ function RiskPrediction() {
     //รายการโมเดลที่เลือกได้ และโมเดลที่เลือกอยู่
     const [models, setModels] = useState([]);
     const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
-
+    
+    //ข้อสนอแนะที่ AI สร้าง
     const [explanation, setExplanation] = useState('');
-const [explaining, setExplaining] = useState(false);
-const explainReqId = useRef(0);
+    const [explaining, setExplaining] = useState(false);
+    const explainReqId = useRef(0);
 
 const fetchExplanation = async (data) => {
     const reqId = ++explainReqId.current;
@@ -121,7 +122,7 @@ const fetchExplanation = async (data) => {
     }
 };
 
-    //โหลดรายการโมเดล (เรียกตอนเปิดหน้า และทุกครั้งที่กดเปิด dropdown เพื่อให้เห็นโมเดลที่เพิ่งรีเทรน/เพิ่งลบทันที)
+    //โหลดรายการโมเดลทั้งหมดที่มี 
     const loadModels = async () => {
         try {
             const res = await getRiskModels();
@@ -312,7 +313,7 @@ const fetchExplanation = async (data) => {
         } catch (error) {
             console.error("Predict failed:", error);
             if (error.response?.status === 404) {
-                //โมเดลที่เลือกไม่มีอยู่แล้ว (เช่นถูกลบไฟล์ไป) ให้โหลดรายการใหม่
+                //โมเดลที่เลือกไม่มีอยู่แล้ว ให้โหลดรายการใหม่
                 setError("ไม่พบโมเดลที่เลือก (อาจถูกลบไปแล้ว) กรุณาเลือกโมเดลใหม่");
                 loadModels();
             } else {
