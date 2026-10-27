@@ -4,10 +4,10 @@ const axios = require('axios');
 
 const FLASK_URL = 'http://127.0.0.1:8001';
 
-//model_id ที่รับได้: 'default' (โมเดลหลัก) หรือเลขเวอร์ชันของโมเดลทดลอง เช่น 20261022_115633
+//model_id ที่รับได้: default(โมเดลหลัก)/เลขเวอร์ชันของโมเดลทดลอง เช่น 20261022_115633
 const MODEL_ID_PATTERN = /^(default|\d{8}_\d{6})$/;
 
-//รายการโมเดลที่เลือกใช้พยากรณ์ได้ (โมเดลหลัก + โมเดลทดลองที่รีเทรนไว้)
+//ดึงรายการโมเดล
 router.get('/models', async (req, res) => {
     try {
         const pythonRes = await axios.get(`${FLASK_URL}/models`, { timeout: 30000 });
