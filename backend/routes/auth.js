@@ -264,9 +264,9 @@ router.post('/add-data', verifyToken, requireAdmin,
                 .filter(c => !/auto_increment/i.test(c.extra))
                 .map(c => c.name);
             const fileCols = Object.keys(records[0]);
-            const useCols = fileCols.filter(c => tableCols.includes(c));
-            const ignoredColumns = fileCols.filter(c => !tableCols.includes(c));
-            const emptyColumns = tableCols.filter(c => !fileCols.includes(c));
+            const useCols = fileCols.filter(c => tableCols.includes(c)); //ชื่อที่ไฟล์และตารางมีตรงกัน
+            const ignoredColumns = fileCols.filter(c => !tableCols.includes(c)); //อยู่ในไฟล์ แต่ตารางไม่มี
+            const emptyColumns = tableCols.filter(c => !fileCols.includes(c)); //อยู่ในตาราง แต่ไฟล์ไม่มี
 
             if (useCols.length === 0) {
                 return res.status(422).json({
@@ -336,8 +336,8 @@ router.post('/add-data', verifyToken, requireAdmin,
                 conn.release();
             }
 
-            //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์
-            let scoreStatus = 'skipped';
+            //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์ 
+            let scoreStatus = 'skipped'; //ยังไม่มีข้อมูลใหม่
             const yearsInFile = [...new Set(
                 rowsToInsert.map(r => Number(r.year)).filter(Number.isFinite)
             )];
@@ -382,10 +382,10 @@ router.post('/add-data', verifyToken, requireAdmin,
             });
         } finally {
             //ลบไฟล์ชั่วคราวทุกครั้ง
-            fs.unlink(inputPath, () => {});
-            fs.unlink(outputPath, () => {});
-            fs.unlink(`${outputPath}.stats.json`, () => {});
-            fs.unlink(`${inputPath}_geo.csv`, () => {});
+            fs.unlink(inputPath, () => {}); //ไฟล์ที่อัปโหลดมา
+            fs.unlink(outputPath, () => {}); //ไฟล์หลังคลีนข้อมูล
+            fs.unlink(`${outputPath}.stats.json`, () => {}); //สถิติแถวที่ถูกตัดทิ้ง
+            fs.unlink(`${inputPath}_geo.csv`, () => {}); //ไฟล์หลังเติมรหัสตำบลจากพิกัด
         }
     }
 );
@@ -395,8 +395,9 @@ const RETRAIN_TIMEOUT_MS = 30 * 60 * 1000;
 const RETRAIN_RESULT_PREFIX = 'RETRAIN_RESULT_JSON:';
 let retrainState = { status: 'idle', startedAt: null, finishedAt: null, result: null, error: null };
 
+//ตัวแปรสถานะ (เก็บในหน่วยความจำ) ส่งให้หน้าเว็บ
 const publicRetrainState = () => ({
-    status: retrainState.status, //idle | running | done | failed
+    status: retrainState.status, //idle(ใช้งานไม่ได้ ปล่อยทิ้งไว้เฉยๆ) | running | done | failed
     startedAt: retrainState.startedAt,
     finishedAt: retrainState.finishedAt,
     durationSec: retrainState.finishedAt
@@ -411,6 +412,7 @@ const scrubSecrets = (text) => {
     return pw ? text.split(pw).join('***') : text;
 };
 
+// สั่งเทรน
 router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
     if (retrainState.status === 'running') {
         return res.status(409).json({
@@ -422,6 +424,7 @@ router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
 
     retrainState = { status: 'running', startedAt: Date.now(), finishedAt: null, result: null, error: null };
 
+    //สั่ง python รัน retrain.py
     execFile(PYTHON_CMD, [RETRAIN_SCRIPT], {
         cwd: path.dirname(RETRAIN_SCRIPT),
         encoding: 'utf8',
