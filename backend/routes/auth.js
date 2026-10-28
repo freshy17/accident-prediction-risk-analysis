@@ -32,6 +32,8 @@ const PROVINCE_ALIAS = {
     'กทม.': 'กรุงเทพมหานคร',
     'กทม': 'กรุงเทพมหานคร'
 };
+
+//ทำให้ชื่อจังหวัดเทียบกันได้
 const normProvince = (s) => {
     const v = String(s ?? '').trim().replace(/^(จังหวัด|จ\.)\s*/, '').replace(/\s+/g, '');
     return PROVINCE_ALIAS[v] || v;
@@ -335,7 +337,6 @@ router.post('/add-data', verifyToken, requireAdmin,
             }
 
             //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์
-            //ถ้าล้มเหลว ไม่ทำให้การอัปโหลดล้มเหลว (ข้อมูลเข้า accidents แล้ว)
             let scoreStatus = 'skipped';
             const yearsInFile = [...new Set(
                 rowsToInsert.map(r => Number(r.year)).filter(Number.isFinite)
@@ -389,9 +390,7 @@ router.post('/add-data', verifyToken, requireAdmin,
     }
 );
 
-//ทดลองรีเทรนโมเดล (เฉพาะแอดมิน) 
-//เทรนเบื้องหลัง ไม่ให้เทรนซ้อนกัน เก็บสถานะไว้ในหน่วยความจำ (หายเมื่อรีสตาร์ท backend)
-//สคริปต์ retrain.py บันทึกโมเดลเป็นไฟล์ทดลองแยกต่างหาก ไม่แทนโมเดลที่เว็บใช้งานจริง
+//ทดลองรีเทรนโมเดล 
 const RETRAIN_TIMEOUT_MS = 30 * 60 * 1000;
 const RETRAIN_RESULT_PREFIX = 'RETRAIN_RESULT_JSON:';
 let retrainState = { status: 'idle', startedAt: null, finishedAt: null, result: null, error: null };
