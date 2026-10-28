@@ -61,11 +61,13 @@ FEATURE_COLS = CAT_FEATURES + ["subdist_total_cases"]
 K_DIST = 10
 K_SUB = 10
 
+#สร้างโฟลเดอร์เก็บโมเดลทดลอง
 MODEL_DIR = os.path.join(BASE_DIR, "models", "experimental")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 engine = create_engine(DB_URL)
 
+#โหลดข้อมูลและแบ่ง train/test
 def load_data_snapshot():
     train = pd.read_sql(f"SELECT * FROM `{SNAPSHOT_TRAIN_TABLE}`", engine)
     test = pd.read_sql(f"SELECT * FROM `{SNAPSHOT_TEST_TABLE}`", engine)
@@ -172,7 +174,8 @@ def load_data():
         latest_year,
     )
 
-def normalize_codes(df):
+#เตรียมและคำนวณคะแนน
+def normalize_codes(df): #ทำให้รหัสเป็นมาตรฐาน
     df = df.copy()
 
     for col, width in [
@@ -202,6 +205,7 @@ def normalize_codes(df):
 
     return df
 
+#ให้คะแนนความรุนแรงต่อเหตุ
 def add_severity(df):
     df = df.copy()
 
@@ -214,6 +218,7 @@ def add_severity(df):
 
     return df
 
+#นับจำนวนปีที่มีข้อมูลจริง
 def get_year_exposure(df):
     monthly_data = df[["year", "month"]].copy()
 
@@ -231,6 +236,7 @@ def get_year_exposure(df):
 
     return exposure
 
+#รวมเป็นกลุ่ม (คะแนนความรุนแรงรวม / จำนวนเหตุ = คะแนนรวมต่อปี)
 def aggregate_groups(df):
     return (
         df.groupby(GROUP_KEYS, dropna=False)
@@ -243,6 +249,8 @@ def aggregate_groups(df):
         .reset_index()
     )
 
+#Shrinkage 
+#ค่าเฉลี่ยของ annualized_score ต่ออำเภอ ถ่วงน้ำหนักด้วย sample_size
 def compute_district_prior(df):
     t = df.assign(ws=df["annualized_score"] * df["sample_size"])
 
@@ -259,6 +267,7 @@ def compute_district_prior(df):
 
     return result[["district_code", "district_prior_mean"]]
 
+#ค่าเฉลี่ยต่อตำบล แล้ว shrink เข้าหา prior อำเภออีกที
 def compute_subdistrict_prior(
     df,
     district_prior,
@@ -284,6 +293,7 @@ def compute_subdistrict_prior(
 
     return result[["subdistrict_code", "sub_prior"]]
 
+#นำ prior มาติดกับแต่ละกลุ่ม แล้ว shrink อีกชั้น
 def apply_shrinkage(
     df,
     district_prior,
@@ -303,6 +313,7 @@ def apply_shrinkage(
 
     return df
 
+#ปรับเป็นสเกล 5-100
 def to_risk_score(df, q95, min_s):
     df = df.copy()
 
@@ -329,17 +340,19 @@ def retrain():
         latest_year,
     ) = load_data()
 
+    #โหลด+เตรียม
     df_train_raw = add_severity(normalize_codes(df_train_raw))
     df_test_raw = add_severity(normalize_codes(df_test_raw))
 
     if SNAPSHOT_MODE:
-        # ตารางสำเนาอาจไม่มีคอลัมน์ year/month จึงใช้จำนวนปีตายตัวเหมือน new_train.ipynb
+        #ตารางสำเนาอาจไม่มีคอลัมน์ year/month จึงใช้จำนวนปีตายตัวเหมือน new_train.ipynb
         train_exposure = float(len(train_years))
         test_exposure = float(len(test_years))
     else:
         train_exposure = get_year_exposure(df_train_raw)
         test_exposure = get_year_exposure(df_test_raw)
 
+    #สร้างคะแนน
     df_train_grp = aggregate_groups(df_train_raw)
     df_test_grp = aggregate_groups(df_test_raw)
 
@@ -431,6 +444,7 @@ def retrain():
             .str.strip()
         )
 
+        #จัดการหมวดหมู่
         categories = list(pd.unique(df_train_grp[col]))
         categories_map[col] = categories
 
@@ -453,6 +467,7 @@ def retrain():
     X_test = df_test_grp[FEATURE_COLS]
     y_test = df_test_grp["risk_score"]
 
+    #เทรนโมเดล
     model = lgb.LGBMRegressor(
         n_estimators=300,
         learning_rate=0.03,
@@ -473,14 +488,13 @@ def retrain():
     train_pred = model.predict(X_train)
     test_pred = model.predict(X_test)
 
+    #วัดผล
     train_r2 = r2_score(y_train, train_pred)
-
     test_r2 = (
         r2_score(y_test, test_pred)
         if len(y_test) >= 2
         else float("nan")
     )
-
     test_mae = mean_absolute_error(y_test, test_pred)
     test_rmse = np.sqrt(mean_squared_error(y_test, test_pred))
 
@@ -513,6 +527,7 @@ def retrain():
         f"lightgbm_{version}.joblib",
     )
 
+    #เซฟโมเดล 
     artifact = {
         "model": model,
         "feature_cols": FEATURE_COLS,
@@ -545,6 +560,7 @@ def retrain():
     print(f"\nSaved experimental model: {model_path}")
     print("Retraining experiment completed.")
 
+    #พิมพ์ผลลัพธ์ให้ backend อ่าน
     def num(x):
         x = float(x)
         return None if math.isnan(x) or math.isinf(x) else x
@@ -565,7 +581,7 @@ def retrain():
         "test_mae": num(test_mae),
         "test_rmse": num(test_rmse),
     }
-    print("RETRAIN_RESULT_JSON:" + json.dumps(summary, allow_nan=False), flush=True)
+    print("RETRAIN_RESULT_JSON:" + json.dumps(summary, allow_nan=False), flush=True) #flush=True ส่งข้อความออกทันที ไม่ค้างใน buffer
 
     return artifact
 
@@ -573,4 +589,4 @@ if __name__ == "__main__":
     try:
         retrain()
     finally:
-        engine.dispose()
+        engine.dispose() #ปิดการเชื่อมต่อฐานข้อมูลเสมอ ไม่ว่าสำเร็จหรือพัง กัน connection ค้าง
