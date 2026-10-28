@@ -25,11 +25,8 @@ EXPERIMENTAL_FILE_RE = re.compile(r'^lightgbm_(\d{8}_\d{6})\.joblib$')
 class ModelNotFound(Exception):
     pass
 
+#หาโฟลเดอร์โมเดลทดลอง
 def find_experimental_dir():
-    """หาโฟลเดอร์ models/experimental (เช็กทุกครั้งที่เรียก เพราะโฟลเดอร์เพิ่งถูกสร้างหลังกดรีเทรนครั้งแรกได้)
-
-    ลำดับที่หา: ตัวแปรแวดล้อม EXPERIMENTAL_MODEL_DIR -> โฟลเดอร์เดียวกับ app.py -> data_pipeline ที่อยู่ระดับบน
-    """
     candidates = []
     env_dir = os.environ.get('EXPERIMENTAL_MODEL_DIR')
     if env_dir:
@@ -44,6 +41,7 @@ def find_experimental_dir():
             return os.path.abspath(c)
     return None
 
+#ทำความสะอาดตัวเลข
 def clean_num(x):
     try:
         x = float(x)
@@ -52,7 +50,7 @@ def clean_num(x):
     return None if math.isnan(x) or math.isinf(x) else x
 
 def extract_meta(model_id, pkg):
-    """ข้อมูลประกอบโมเดลสำหรับ dropdown (ปีที่ใช้เทรน ค่าวัดผล ฯลฯ) อ่านจากในไฟล์โมเดลเอง"""
+    #สร้างข้อมูลประกอบโมเดลสำหรับ dropdown (ปีที่ใช้เทรน ค่าวัดผล ฯลฯ) อ่านจากในไฟล์โมเดลเอง
     is_default = model_id == DEFAULT_MODEL_ID
     created_at = None
     if not is_default:
@@ -72,6 +70,7 @@ def extract_meta(model_id, pkg):
         'metrics': {k: clean_num(v) for k, v in metrics.items()} if metrics else None,
     }
 
+#แปลง id เป็นพาธไฟล์
 def model_path(model_id):
     if model_id == DEFAULT_MODEL_ID:
         return DEFAULT_MODEL_FILE
@@ -86,7 +85,7 @@ def model_path(model_id):
 _package_cache = {}
 
 def load_package(model_id):
-    """โหลดโมเดล + ข้อมูลประกอบ + SHAP explainer (โหลดครั้งเดียวแล้วเก็บแคช)"""
+    #โหลดโมเดล + ข้อมูลประกอบ + SHAP explainer (โหลดครั้งเดียวแล้วเก็บแคช)
     path = model_path(model_id)
     if not os.path.isfile(path):
         raise ModelNotFound(f'ไม่พบไฟล์โมเดล: {model_id}')
@@ -101,18 +100,18 @@ def load_package(model_id):
     entry = {
         'mtime': mtime,
         'model': pkg['model'],
-        'cat_features': pkg['cat_features'],
-        'feature_cols': pkg['feature_cols'],
-        'categories': pkg['categories'],
+        'cat_features': pkg['cat_features'], #รายชื่อคอลัมน์ที่เป็นหมวดหมู่
+        'feature_cols': pkg['feature_cols'], #ลำดับคอลัมน์ที่โมเดลต้องการ
+        'categories': pkg['categories'], #ค่าหมวดหมู่ที่เจอตอนเทรนของแต่ละคอลัมน์
         'subdistrict_hist': pkg['subdistrict_hist'],
-        'fill_val': pkg['fill_val'],
+        'fill_val': pkg['fill_val'], #ค่าสำรองเมื่อหาข้อมูลตำบลไม่เจอ
         'explainer': shap.TreeExplainer(pkg['model']),
         'meta': extract_meta(model_id, pkg),
     }
     _package_cache[model_id] = entry
     return entry
 
-#โหลดโมเดลหลักตอนเริ่มระบบ (เหมือนเดิม ถ้าไฟล์หายจะรู้ตั้งแต่เปิด)
+#โหลดโมเดลหลักตอนเริ่มระบบ (ถ้าไฟล์หายจะรู้ตั้งแต่เปิด)
 load_package(DEFAULT_MODEL_ID)
 
 DAY_MAPPING = {
@@ -124,7 +123,7 @@ DAY_MAPPING = {
 
 @app.route('/models', methods=['GET'])
 def list_models():
-    """รายการโมเดลที่เลือกใช้พยากรณ์ได้: โมเดลหลัก + โมเดลทดลอง (ใหม่สุดขึ้นก่อน)"""
+    #รายการโมเดลที่เลือกใช้พยากรณ์ได้: โมเดลหลัก + โมเดลทดลอง (ใหม่สุดขึ้นก่อน)
     try:
         models = [load_package(DEFAULT_MODEL_ID)['meta']]
 
@@ -152,7 +151,7 @@ def predict():
         data = request.json
         print("Received Data:", data)
 
-        #เลือกโมเดล: ไม่ส่งมา = ใช้โมเดลหลัก
+        #เลือกโมเดล (ถ้าไม่ส่งมา ใช้โมเดลหลัก)
         model_id = data.get('model_id') or DEFAULT_MODEL_ID
         try:
             pkg = load_package(model_id)
