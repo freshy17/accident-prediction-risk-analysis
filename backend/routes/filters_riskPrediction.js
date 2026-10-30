@@ -52,7 +52,7 @@ router.get('/districts', async(req, res) => {
     }
 });
 
-// 3. GET /api/filters/subdistricts?district_code=XXXX - ดึงตำบลและนับจำนวนอุบัติเหตุ
+//GET /api/filters/subdistricts?district_code=XXXX - ดึงตำบลและนับจำนวนอุบัติเหตุ
 router.get('/subdistricts', async (req, res) => {
     const { district_code } = req.query;
 
