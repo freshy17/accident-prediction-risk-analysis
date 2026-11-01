@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from 'axios';
 import { X } from 'lucide-react';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AdminLogin = ({ isOpen, onClose, onLoginSuccess }) => {
     const [username, setUsername] = useState('');
@@ -16,7 +17,7 @@ const AdminLogin = ({ isOpen, onClose, onLoginSuccess }) => {
         setLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:5000/api/admin/login', {
+            const response = await axios.post(`${API_URL}/api/admin/login`, {
                 username,
                 password
             });

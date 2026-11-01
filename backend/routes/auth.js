@@ -465,4 +465,42 @@ router.get('/retrain/status', verifyToken, requireAdmin, (req, res) => {
     res.json({ success: true, ...publicRetrainState() });
 });
 
+//ดูรายชื่อแอดมิน
+router.get('/users', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            'SELECT user_id, username, role, created_at FROM users ORDER BY user_id');
+        res.json({ success: true, total: rows.length, users: rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Error in Server' });
+    }
+});
+
+//ลบแอดมิน
+router.delete('/users/:id', verifyToken, requireAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+        return res.status(400).json({ success: false, message: 'รหัสผู้ใช้ไม่ถูกต้อง' });
+    }
+    if (id === req.user.userId) {
+        return res.status(400).json({ success: false, message: 'ไม่สามารถลบบัญชีของตัวเองได้' });
+    }
+    try {
+        const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'");
+        const [target] = await db.query('SELECT role FROM users WHERE user_id = ?', [id]);
+        if (target.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบผู้ใช้นี้' });
+        }
+        if (target[0].role === 'admin' && total <= 1) {
+            return res.status(400).json({ success: false, message: 'ไม่สามารถลบแอดมินคนสุดท้ายได้' });
+        }
+        await db.query('DELETE FROM users WHERE user_id = ?', [id]);
+        res.json({ success: true, message: 'ลบบัญชีสำเร็จ' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Error in Server' });
+    }
+});
+
 module.exports = router;

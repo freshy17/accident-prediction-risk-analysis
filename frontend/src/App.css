@@ -854,3 +854,127 @@ details {
   color: #64748b;
   font-size: 0.75rem;
 }
+
+/* ปุ่มเพิ่มแอดมิน */
+.admin-add-wrap {
+  position: relative;
+  height: 0;
+  display: flow-root;
+  margin-bottom: -40px;
+}
+
+.admin-add-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3182ce;
+  background: #fff;
+  border: 1px solid #3182ce;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.admin-add-btn:hover {
+  background-color: #ebf8ff;
+}
+
+/* จอแคบ: ให้ปุ่มอยู่เหนือการ์ด ไม่ลอยทับ */
+@media (max-width: 1000px) {
+  .admin-add-wrap {
+    height: auto;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .admin-add-btn {
+    position: static;
+  }
+}
+
+/* จัดการแอดมิน (เพิ่มต่อท้าย App.css) */
+.admin-manage-container {
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.admin-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 12px 0 8px;
+}
+
+.admin-user-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.admin-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-user-table th,
+.admin-user-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-user-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.admin-user-empty {
+  padding: 12px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.admin-me-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: #3182ce;
+  background: #ebf8ff;
+  border-radius: 9999px;
+}
+
+.admin-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: #e53e3e;
+  background: #fff;
+  border: 1px solid #e53e3e;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.admin-delete-btn:hover:not(:disabled) {
+  background: #fff5f5;
+}
+
+.admin-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import AdminCreateUser from "./AdminCreateUser";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // จำกัดไฟล์ 10 MB
@@ -210,6 +211,7 @@ function AdminUpload() {
 
     return (
         <>
+            <AdminCreateUser />
             <div className="admin-form-container">
                 <h2>เพิ่มไฟล์ข้อมูลอุบัติเหตุ</h2>
 

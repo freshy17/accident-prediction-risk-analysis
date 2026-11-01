@@ -16,7 +16,6 @@ import {
     getHolidayCompareData,
     getProvinceList
 } from "../api/apiService";
-import { use } from "react";
 
 const Dashboard = () => {
 
@@ -52,6 +51,11 @@ const Dashboard = () => {
             }
         }
         fetchProvinces();
+    }, []);
+
+    useEffect(() => {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRole');
     }, []);
 
     //หาชื่อจังหวัดตาม province_code ที่ถูกเลือกใน Filter
@@ -121,6 +125,15 @@ const Dashboard = () => {
         setActiveTab('upload');
     };
 
+    const handleTabChange = (tab) => {
+    if (activeTab === 'upload' && tab !== 'upload') {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRole');
+        setIsAdminLoggedIn(false);
+    }
+    setActiveTab(tab);
+    };
+
     return (
         <div>
             <NavBar onAdminClick={() => setIsLoginOpen(true)} />
@@ -136,7 +149,7 @@ const Dashboard = () => {
                     overflow: 'hidden',
                     }}>
                     <button
-                        onClick={() => setActiveTab('dashboard')}
+                        onClick={() => handleTabChange('dashboard')}
                         style={{
                             flex: 1,
                             padding: '12px 16px',
@@ -154,7 +167,7 @@ const Dashboard = () => {
                         Dashboard
                     </button>
                     <button
-                        onClick={() => setActiveTab('prediction')}
+                        onClick={() => handleTabChange('prediction')}
                         style={{
                            flex: 1,
                             padding: '12px 16px',
