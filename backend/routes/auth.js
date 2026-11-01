@@ -150,6 +150,80 @@ router.post('/register-admin', verifyToken, requireAdmin, async (req, res) => {
     }
 });
 
+//สรุปข้อมูลที่เพิ่งบันทึกเข้าระบบ ให้แอดมินตรวจได้โดยไม่ต้องเปิดฐานข้อมูล
+const buildInsertSummary = async (rows, firstInsertId) => {
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+    const pad = (n) => String(n).padStart(2, '0');
+    const first = rows[0] || {};
+    const has = (k) => k in first;
+
+    const [provRows] = await db.query('SELECT province_code, pro_name_th FROM provinces');
+    const provName = new Map(provRows.map(p => [String(p.province_code), p.pro_name_th]));
+
+    const provOf = (r) => {
+        if (has('province_code') && r.province_code !== '' && r.province_code != null) {
+            return provName.get(String(r.province_code)) || String(r.province_code);
+        }
+        if (has('จังหวัด') && String(r['จังหวัด'] ?? '').trim()) return String(r['จังหวัด']).trim();
+        return 'ไม่ระบุ';
+    };
+    const injuriesOf = (r) => has('total_injuries')
+        ? num(r.total_injuries)
+        : num(r.serious_injuries) + num(r.minor_injuries);
+    const dateKey = (r) => {
+        if (!(has('year') && has('month') && has('day'))) return null;
+        const y = num(r.year), m = num(r.month), d = num(r.day);
+        return (y > 0 && m > 0 && d > 0) ? y * 10000 + m * 100 + d : null;
+    };
+    const keyLabel = (k) => k === null ? '-'
+        : `${pad(k % 100)}/${pad(Math.floor(k / 100) % 100)}/${Math.floor(k / 10000)}`;
+
+    let minKey = null, maxKey = null, deaths = 0, injuries = 0;
+    const years = new Set();
+    const provCount = new Map();
+
+    for (const r of rows) {
+        const k = dateKey(r);
+        if (k !== null) {
+            if (minKey === null || k < minKey) minKey = k;
+            if (maxKey === null || k > maxKey) maxKey = k;
+        }
+        if (has('year') && num(r.year) > 0) years.add(num(r.year));
+        deaths += num(r.deaths);
+        injuries += injuriesOf(r);
+        const p = provOf(r);
+        provCount.set(p, (provCount.get(p) || 0) + 1);
+    }
+
+    //ดึงตัวอย่างจากฐานข้อมูลจริง เรียงคอลัมน์ตามตาราง (รวม accident_id)
+    let sampleColumns = [];
+    let sampleRows = [];
+    if (firstInsertId) {
+        const [sample] = await db.query(
+            'SELECT * FROM accidents WHERE accident_id >= ? ORDER BY accident_id LIMIT 10',
+            [firstInsertId]);
+        if (sample.length > 0) {
+            sampleColumns = Object.keys(sample[0]);
+            sampleRows = sample.map(r => sampleColumns.map(c =>
+                (r[c] === null || r[c] === undefined) ? 'NULL' : String(r[c])));
+        }
+    }
+
+    return {
+        dateFrom: keyLabel(minKey),
+        dateTo: keyLabel(maxKey),
+        years: [...years].sort((a, b) => a - b),
+        accidents: rows.length,
+        deaths,
+        injuries,
+        topProvinces: [...provCount.entries()]
+            .sort((a, b) => b[1] - a[1]).slice(0, 5)
+            .map(([name, count]) => ({ name, count })),
+        sampleColumns, 
+        sampleRows,
+    };
+};
+
 //API สำหรับ เพิ่มข้อมูลหน้า AdminUpload
 router.post('/add-data', verifyToken, requireAdmin,
     //รับไฟล์ข้อมูลชุดใหม่
@@ -316,6 +390,7 @@ router.post('/add-data', verifyToken, requireAdmin,
             //insert เป็นชุด ใน transaction (ถ้าพังกลางทางจะ rollback ทั้งหมด)
             const conn = await db.getConnection();
             let inserted = 0;
+            let firstInsertId = null;
             try {
                 await conn.beginTransaction();
                 const colSql = useCols.map(c => `\`${c}\``).join(', ');
@@ -326,6 +401,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                     const [result] = await conn.query(
                         `INSERT INTO accidents (${colSql}) VALUES ?`, [chunk]);
                     inserted += result.affectedRows;
+                    if (firstInsertId === null) firstInsertId = result.insertId;
                 }
 
                 await conn.commit();
@@ -352,6 +428,16 @@ router.post('/add-data', verifyToken, requireAdmin,
                 }
             }
 
+            //สรุปข้อมูลที่เพิ่งเพิ่ม (ถ้าสรุปพัง ไม่ให้การอัปโหลดล้มเหลว)
+            let summary = null;
+            if (inserted > 0) {
+                try {
+                    summary = await buildInsertSummary(rowsToInsert, firstInsertId);
+                } catch (e) {
+                    console.error('summary error:', e.message);
+                }
+            }
+
             res.json({
                 success: true,
                 inserted,
@@ -372,6 +458,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 skippedDuplicates,
                 dedupApplied: canDedup,
                 scoreStatus,
+                summary,
             });
 
         } catch (error) {

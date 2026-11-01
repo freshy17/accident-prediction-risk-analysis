@@ -899,7 +899,7 @@ details {
   }
 }
 
-/* จัดการแอดมิน (เพิ่มต่อท้าย App.css) */
+/* จัดการแอดมิน */
 .admin-manage-container {
   max-width: 520px;
   max-height: 90vh;
@@ -977,4 +977,57 @@ details {
 .admin-delete-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Preview ชุดข้อมูลที่เพิ่มเข้าไป */
+.upload-summary {
+  margin: 12px 0 16px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #334155;
+}
+
+.upload-summary h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.upload-summary h4 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.upload-summary ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.upload-summary-scroll {
+  overflow-x: auto;
+}
+
+.upload-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.upload-summary-table th,
+.upload-summary-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.upload-summary-table th {
+  background: #eef2f7;
+  color: #475569;
+  font-weight: 600;
 }

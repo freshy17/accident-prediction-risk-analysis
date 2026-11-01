@@ -13,6 +13,7 @@ function AdminUpload() {
     const [techDetail, setTechDetail] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [summary, setSummary] = useState(null); //สรุปข้อมูลที่เพิ่งเพิ่มเข้าระบบ
 
     //ทดลองรีเทรนโมเดล
     const [retrain, setRetrain] = useState({ status: 'idle', result: null, error: '', durationSec: null });
@@ -97,6 +98,7 @@ function AdminUpload() {
         setWarning('');
         setTechDetail('');
         setError('');
+        setSummary(null);
     };
 
     const handleFileChange = (e) => {
@@ -147,13 +149,15 @@ function AdminUpload() {
                     unmatchedProvinces = [], geoFar = 0, geoDistrictOnly = 0, geoUnmatched = 0,
                     rawRows = null, dropped = {},
                     skippedDuplicates = 0, dedupApplied = true, 
-                    scoreStatus = 'skipped' } = response.data;
+                    scoreStatus = 'skipped', summary: summaryData = null } = response.data;
 
             if (inserted === 0) {
                 setMessage('ไม่มีข้อมูลใหม่ ข้อมูลในไฟล์นี้มีอยู่ในระบบแล้วทั้งหมด');
             } else {
                 setMessage(`เพิ่มข้อมูลสำเร็จ ${inserted} จาก ${totalRows} แถว (สามารถทดลองรีเทรนโมเดลด้วยข้อมูลล่าสุดได้ที่การ์ดด้านล่าง)`);
             }
+
+            setSummary(summaryData);
 
             const notes = [];
             const techNotes = []; 
@@ -218,6 +222,42 @@ function AdminUpload() {
                 {message && <p className="success-message">{message}</p>}
                 {warning && <p className="warning-message">{warning}</p>}
                 {error && <p className="error-message">{error}</p>}
+
+                {summary && (
+                    <div className="upload-summary">
+                        <h3>สรุปข้อมูลที่เพิ่มเข้าระบบ</h3>
+                        <ul>
+                            <li>ช่วงวันที่: {summary.dateFrom} ถึง {summary.dateTo}</li>
+                            <li>ปีที่พบในข้อมูล: {summary.years.length > 0 ? summary.years.join(', ') : '-'}</li>
+                            <li>อุบัติเหตุ {summary.accidents.toLocaleString()} ครั้ง</li>
+                            <li>ผู้เสียชีวิต {summary.deaths.toLocaleString()} ราย</li>
+                            <li>ผู้บาดเจ็บ {summary.injuries.toLocaleString()} ราย</li>
+                        </ul>
+
+                        {summary.sampleRows.length > 0 && (
+                            <>
+                                <h4>ตัวอย่างข้อมูลที่เพิ่ม (10 แถวแรก)</h4>
+                                <div className="upload-summary-scroll">
+                                    <table className="upload-summary-table">
+                                        <thead>
+                                            <tr>
+                                                {summary.sampleColumns.map((c) => <th key={c}>{c}</th>)}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {summary.sampleRows.map((row, i) => (
+                                                <tr key={i}>
+                                                    {row.map((v, j) => <td key={j}>{v}</td>)}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
                 {techDetail && (
                     <details>
                         <summary>รายละเอียดคอลัมน์ (สำหรับผู้ดูแลระบบ)</summary>
