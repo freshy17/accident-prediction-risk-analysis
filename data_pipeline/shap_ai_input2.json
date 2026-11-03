@@ -9,46 +9,46 @@
   },
   "time_period": "บ่าย (12:00 - 15:59)",
   "day_type": "new_year",
-  "risk_score": 13.71,
+  "risk_score": 13.56,
   "risk_level": "ต่ำ",
-  "shap_base_value": 40.3724242955331,
-  "raw_prediction": 13.710222465122616,
+  "shap_base_value": 40.318128505550085,
+  "raw_prediction": 13.558292403273859,
   "shap_factors": [
     {
       "feature": "district_code",
       "value": "1910",
-      "shap_value": -15.482516,
+      "shap_value": -15.708874,
       "direction": "decreases_prediction"
     },
     {
       "feature": "subdist_total_cases",
       "value": 6,
-      "shap_value": -10.403107,
+      "shap_value": -10.455672,
       "direction": "decreases_prediction"
     },
     {
       "feature": "day_type",
       "value": "new_year",
-      "shap_value": -0.435113,
+      "shap_value": -0.455103,
       "direction": "decreases_prediction"
     },
     {
       "feature": "subdistrict_code",
       "value": "191007",
-      "shap_value": -0.237857,
-      "direction": "decreases_prediction"
-    },
-    {
-      "feature": "province_code",
-      "value": "19",
-      "shap_value": -0.214599,
+      "shap_value": -0.151605,
       "direction": "decreases_prediction"
     },
     {
       "feature": "time_period",
       "value": "บ่าย (12:00 - 15:59)",
-      "shap_value": 0.11099,
+      "shap_value": 0.106271,
       "direction": "increases_prediction"
+    },
+    {
+      "feature": "province_code",
+      "value": "19",
+      "shap_value": -0.094853,
+      "direction": "decreases_prediction"
     }
   ]
 }
