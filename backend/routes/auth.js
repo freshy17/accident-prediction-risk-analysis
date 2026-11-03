@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; 
 const PYTHON_CMD = process.env.PYTHON_CMD || 'python';
 //ปรับ path ให้ตรงกับที่เก็บ clean_admin.py จริง 
 const CLEAN_SCRIPT = process.env.CLEAN_SCRIPT ||
@@ -230,7 +230,7 @@ router.post('/add-data', verifyToken, requireAdmin,
     (req, res, next) => {
         upload.single('file')(req, res, (err) => {
             if (err) {
-                const msg = err.code === 'LIMIT_FILE_SIZE' ? 'ไฟล์ใหญ่เกิน 10 MB' : err.message;
+                const msg = err.code === 'LIMIT_FILE_SIZE' ? 'ไฟล์ใหญ่เกิน 50 MB' : err.message;
                 return res.status(400).json({ success: false, message: msg });
             }
             next();

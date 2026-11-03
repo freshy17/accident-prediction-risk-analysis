@@ -24,7 +24,7 @@ const Dashboard = () => {
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
     
     const initialFilters = {
-        year: '2025',
+        year: '',
         province: '',
         timeRange: '',
         dayType: ''
@@ -70,49 +70,41 @@ const Dashboard = () => {
 
     //ดึงข้อมูลใหม่ทุกครั้งที่ filters เปลี่ยน
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            setLoading(true);
-            try {
+    if (!filters.year) return;         
+    let cancelled = false;
 
-                //ดึงข้อมูล 4 ส่วนพร้อมกันเพื่อความเร็ว
-                const [summaryRes, hotspotRes, top10Res, holidayRes] = await Promise.all([
-                    getSummaryData(filters).catch(err => { console.error("Summary API Error:", err); return null; }),
-                    getHotspotPoints(filters.year, filters.province).catch(err => { console.error("Hotspot API Error:", err); return null; }),
-                    getTop10(filters.year, filters.province).catch(err => { console.error("Top10 API Error:", err); return null; }),
-                    getHolidayCompareData(filters.year, filters.province).catch(err => { console.error("Holiday API Error (404):", err); return null; })
-                ]);
+    const fetchDashboardData = async () => {
+        setLoading(true);
+        try {
+            const [summaryRes, hotspotRes, top10Res, holidayRes] = await Promise.all([
+                getSummaryData(filters).catch(err => { console.error("Summary API Error:", err); return null; }),
+                getHotspotPoints(filters.year, filters.province).catch(err => { console.error("Hotspot API Error:", err); return null; }),
+                getTop10(filters.year, filters.province).catch(err => { console.error("Top10 API Error:", err); return null; }),
+                getHolidayCompareData(filters.year, filters.province).catch(err => { console.error("Holiday API Error:", err); return null; })
+            ]);
+            if (cancelled) return;    
 
-                const resData = summaryRes?.data || summaryRes;
-                    if (resData) {
-                        setSummaryData({
-                            totalAccidents: resData.total_accidents || 0,
-                            totalDeaths: resData.total_deaths || 0,
-                            totalInjuries: resData.total_injuries || 0,
-                            mostRiskyTime: resData.most_risky_time || "-",
-                    });
-                }
-
-                if (hotspotRes) {
-                    setHotspots(hotspotRes.data || hotspotRes);
-                }
-
-                if (top10Res) {
-                    const data = top10Res.data?.data || top10Res.data || top10Res;
-                    setTop10Data(data);
-                }
-
-                if (holidayRes) {
-                    setHolidayData(holidayRes.data || holidayRes);
-                }
-
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            } finally {
-                setLoading(false);
+            const resData = summaryRes?.data || summaryRes;
+            if (resData) {
+                setSummaryData({
+                    totalAccidents: resData.total_accidents || 0,
+                    totalDeaths: resData.total_deaths || 0,
+                    totalInjuries: resData.total_injuries || 0,
+                    mostRiskyTime: resData.most_risky_time || "-",
+                });
             }
-        };
+            if (hotspotRes) setHotspots(hotspotRes.data || hotspotRes);
+            if (top10Res) setTop10Data(top10Res.data?.data || top10Res.data || top10Res);
+            if (holidayRes) setHolidayData(holidayRes.data || holidayRes);
+        } catch (error) {
+            console.error("Error fetching dashboard data:", error);
+        } finally {
+            if (!cancelled) setLoading(false);
+        }
+    };
 
-        fetchDashboardData();
+    fetchDashboardData();
+        return () => { cancelled = true; };
     }, [filters]);
 
     const handleReset = () => {

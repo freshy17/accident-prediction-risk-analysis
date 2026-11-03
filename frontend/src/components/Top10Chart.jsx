@@ -42,14 +42,14 @@ const CustomBar = (props) => {
             width={width}
             height={height}
             fill={barColor}
-            rx={6} // โค้งมนฝั่งขวา
+            rx={6} //โค้งมนฝั่งขวา
             ry={6}
         />
     );
 };
 
 function Top10Chart({ filters }) {
-    const [chartData, setChartData] = useState(defaultMockTop10);
+    const [chartData, setChartData] = useState([]);
     const [loading, setLoading] = useState(false);
 
     //ตรวจสอบสถานะของการเลือกจังหวัด
@@ -68,34 +68,36 @@ function Top10Chart({ filters }) {
         : `Top 10 จังหวัดที่เกิดอุบัติเหตุสูงสุด${yearText}`;
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                //เรียกใช้ API 
-                const response = await getTop10(filters.year, filters.province);
-                console.log("Data from Backend Top10:", response);
+    let ignore = false;
 
-                const list = response?.data?.data || response?.data || response || [];
-                if (Array.isArray(list) && list.length > 0 ) {
-                    const formattedData = list.map(item => ({
-                        name: item.name || 'ไม่ระบุ',
-                        count: Number(item.total || 0) //แปลง string ให้เป็น Number
-                    })) ;
-                    setChartData(formattedData);
-                } else {
-                    //เลือกจังหวัดแล้วแต่ยังไม่มีข้อมูลที่ส่งมาจาก Backend ให้คืนค่าเป็นอาร์เรย์ว่าง
-                    setChartData(hasSelectedProvince ? [] : defaultMockTop10);
-                }
-            } catch (error) {
-                console.error("Error fetching Top10 Data:", error);
-                setChartData(hasSelectedProvince ? [] : defaultMockTop10);
-            } finally {
-                setLoading(false);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const response = await getTop10(filters.year, filters.province);
+            if (ignore) return;
+            console.log("Data from Backend Top10:", response);
+
+            const list = response?.data?.data || response?.data || response || [];
+            if (Array.isArray(list) && list.length > 0) {
+                setChartData(list.map(item => ({
+                    name: item.name || 'ไม่ระบุ',
+                    count: Number(item.total || 0)
+                })));
+            } else {
+                setChartData([]);
             }
-        };
+        } catch (error) {
+            if (ignore) return;
+            console.error("Error fetching Top10 Data:", error);
+            setChartData([]);
+        } finally {
+            if (!ignore) setLoading(false);
+        }
+    };
 
-        fetchData();
-    }, [filters.year, filters.province])
+    fetchData();
+    return () => { ignore = true; };
+}, [filters.year, filters.province]);
 
     return (
         <div className="chart-card">
@@ -108,7 +110,7 @@ function Top10Chart({ filters }) {
             <div className="chart-container-wrapper" style={{ height: '320px', width: '100% '}}>
                 {chartData.length === 0 && !loading ? (
                     <div className="no-data" style={{ textAlign: 'center', padding: '50px 0', color: '#64748b' }}>
-                        ไม่พบข้อมูลอุบัติเหตุในจังหวัดที่เลือก
+                        ไม่พบข้อมูลอุบัติเหตุ
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">

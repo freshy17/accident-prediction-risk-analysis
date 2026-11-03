@@ -33,34 +33,37 @@ function HolidayCompareChart({ filters = {}, provinceName = ''}) {
         : `กราฟแสดงข้อมูลเปรียบเทียบจำนวนอุบัติเหตุระหว่างช่วงวันปกติ VS หยุดปีใหม่ VS สงกรานต์${yearText}`;
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
+    let ignore = false;
 
-                //เรียกใช้ API 
-                const response = await getHolidayCompareData(filters.year, filters.province);
-                const list = response?.data || response || [];
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const response = await getHolidayCompareData(filters.year, filters.province);
+            if (ignore) return;
+            const list = response?.data || response || [];
 
-                if (Array.isArray(list) && list.length > 0) {
-                    const formattedData = list.map(item => ({
-                        name: item.name || 'ไม่ระบุ',
-                        normal: Number(item.normal || 0),  
-                        newYear: Number(item.newYear || 0),  
-                        songkran: Number(item.songkran || 0),  
-                    }));
-                    setChartData(formattedData);
-                } else {
-                    setChartData(hasSelectedProvince ? [] : defaultMockHolidayData);
-                }
-            } catch (error) {
-                console.error("Error fetching HolidayCompare data:", error);
-                setChartData(hasSelectedProvince ? [] : defaultMockHolidayData);
-            } finally {
-                setLoading(false);
+            if (Array.isArray(list) && list.length > 0) {
+                setChartData(list.map(item => ({
+                    name: item.name || 'ไม่ระบุ',
+                    normal: Number(item.normal || 0),
+                    newYear: Number(item.newYear || 0),
+                    songkran: Number(item.songkran || 0),
+                })));
+            } else {
+                setChartData([]);
             }
-        };
-        fetchData();
-    }, [filters.year, filters.province]);
+        } catch (error) {
+            if (ignore) return;
+            console.error("Error fetching HolidayCompare data:", error);
+            setChartData([]);
+        } finally {
+            if (!ignore) setLoading(false);
+        }
+    };
+
+    fetchData();
+    return () => { ignore = true; };
+}, [filters.year, filters.province]);
 
     return (
     <div className='holiday-chart-card'>
@@ -75,7 +78,7 @@ function HolidayCompareChart({ filters = {}, provinceName = ''}) {
                 </div>
             ) : !chartData || chartData.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#64748b'}}>
-                    ไม่มีข้อมูลอุบัติเหตุในจังหวัดที่เลือก
+                    ไม่มีข้อมูลอุบัติเหตุ
                 </div>
             ) : (
                 <ResponsiveContainer width="100%" height="100%">

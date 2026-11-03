@@ -58,7 +58,8 @@ def main():
             f"""SELECT province_code, district_code, subdistrict_code, time_period,
                        day_type, year, deaths, serious_injuries, minor_injuries
                 FROM accidents WHERE year IN ({placeholders})
-                  AND district_code IS NOT NULL""", conn, params=years)
+                    AND district_code IS NOT NULL
+                    AND province_code IS NOT NULL""", conn, params=years)
         if df.empty:
             print(json.dumps({"scored_groups": 0, "years": years}))
             return

@@ -5,6 +5,7 @@ import { getYearList, getProvinceList } from "../api/apiService";
 const FilterBar = ({ filters, setFilters, onReset }) => {
   const [yearList, setYearList] = useState([]);
   const [provinceList, setProvinceList] = useState([]);
+  const [yearsLoaded, setYearsLoaded] = useState(false);
 
 //ดึงข้อมูลปีและจังหวัดตอนเปิดหน้าเว็บ
 useEffect(() => {
@@ -20,6 +21,7 @@ useEffect(() => {
 
         setYearList(yearData?.data || []);
         setProvinceList(provinceData?.data || []);
+        setYearsLoaded(true);
     } catch (error) {
       console.error("Error fetching dropdown data:", error)
     }
@@ -27,6 +29,25 @@ useEffect(() => {
 
   fetchDropdownData();
 }, []);
+
+//ถ้าปีที่เลือกอยู่ไม่มีในฐานข้อมูล ให้เปลี่ยนเป็นปีล่าสุดที่มีจริง (หรือว่างถ้าไม่มีข้อมูลเลย)
+useEffect(() => {
+  if (!yearsLoaded) return;
+  const years = yearList.map((item) => String(item.year || item));
+  const current = String(filters?.year ?? "");
+
+  if (years.length === 0) {
+    if (current !== "") setFilters((prev) => ({ ...prev, year: "" }));
+  } else if (!years.includes(current)) {
+    setFilters((prev) => ({ ...prev, year: years[0] })); //backend เรียงปีใหม่ไปเก่า
+  }
+}, [yearsLoaded, yearList, filters?.year]);
+
+useEffect(() => {
+  if (filters?.year || yearList.length === 0) return;
+  const first = yearList[0]?.year ?? yearList[0];   // API เรียงปีล่าสุดขึ้นก่อน
+  setFilters((prev) => (prev.year ? prev : { ...prev, year: String(first) }));
+}, [yearList, filters?.year]);
 
 const handleChange = (e) => {
     const { name, value } = e.target;
