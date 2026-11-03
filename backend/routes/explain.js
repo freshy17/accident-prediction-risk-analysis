@@ -110,16 +110,46 @@ async function callGeminiOnce(model, payload, systemPrompt) {
 
 //ลองโมเดลหลักก่อน (retry เมื่อ 429/5xx/timeout/ว่าง) แล้วค่อยสลับไปโมเดลสำรอง
 //ตั้งใน .env ได้: GEMINI_MODEL=... และ GEMINI_FALLBACK_MODEL=...
+// async function callGemini(payload, systemPrompt) {
+//     const models = [
+//         process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+//         process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash',
+//     ].filter((m, i, a) => m && a.indexOf(m) === i);
+//     const ATTEMPTS = 2;
+//     let lastErr;
+
+//     for (const model of models) {
+//         for (let i = 1; i <= ATTEMPTS; i++) {
+//             try {
+//                 return await callGeminiOnce(model, payload, systemPrompt);
+//             } catch (e) {
+//                 lastErr = e;
+//                 const status = e.response?.status;
+//                 const msg = e.response?.data?.error?.message || e.message;
+//                 console.error(`[explain] ${model} ครั้งที่ ${i}/${ATTEMPTS} ล้ม (${status || 'no status'}): ${msg}`);
+//                 const retryable = !status || RETRYABLE.has(status) || /ว่างเปล่า/.test(e.message);
+//                 if (!retryable) break; //เช่น 400/403 ลองซ้ำก็ไม่หาย ข้ามไปโมเดลถัดไป
+//                 if (i < ATTEMPTS) await sleep(1000 * i); //รอ 1 วิ
+//             }
+//         }
+//     }
+//     //ถ้าลองทุกโมเดลแล้วไม่สำเร็จ
+//     throw lastErr; 
+// }
+
 async function callGemini(payload, systemPrompt) {
     const models = [
         process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
         process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash',
+        process.env.GEMINI_FALLBACK_MODEL_2 || 'gemini-3.5-flash-lite',
     ].filter((m, i, a) => m && a.indexOf(m) === i);
-    const ATTEMPTS = 2;
+    const ATTEMPTS = 3;
+    const DEADLINE = Date.now() + 50000; //รวมแล้วไม่เกิน ~50 วินาที ไม่ให้หน้าเว็บรอนานเกิน
     let lastErr;
 
     for (const model of models) {
         for (let i = 1; i <= ATTEMPTS; i++) {
+            if (Date.now() > DEADLINE) throw lastErr || new Error('หมดเวลารอ Gemini');
             try {
                 return await callGeminiOnce(model, payload, systemPrompt);
             } catch (e) {
@@ -128,13 +158,12 @@ async function callGemini(payload, systemPrompt) {
                 const msg = e.response?.data?.error?.message || e.message;
                 console.error(`[explain] ${model} ครั้งที่ ${i}/${ATTEMPTS} ล้ม (${status || 'no status'}): ${msg}`);
                 const retryable = !status || RETRYABLE.has(status) || /ว่างเปล่า/.test(e.message);
-                if (!retryable) break; //เช่น 400/403 ลองซ้ำก็ไม่หาย ข้ามไปโมเดลถัดไป
-                if (i < ATTEMPTS) await sleep(1000 * i); //รอ 1 วิ
+                if (!retryable) break;
+                if (i < ATTEMPTS) await sleep(2000 * i + Math.random() * 500); //รอ ~2, ~4 วินาที
             }
         }
     }
-    //ถ้าลองทุกโมเดลแล้วไม่สำเร็จ
-    throw lastErr; 
+    throw lastErr;
 }
 
 //กันกรณี AI ใส่ Markdown มาทั้งที่ห้ามไว้ (หน้าเว็บแสดงเป็นข้อความธรรมดา)
