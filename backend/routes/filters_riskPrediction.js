@@ -63,18 +63,20 @@ router.get('/subdistricts', async (req, res) => {
     try {
         const query = `
             SELECT 
-                s.code AS subdistrict_code,
+                s.subdistrict_code AS subdistrict_code,
                 s.name_in_thai AS sub_name_th,
                 COUNT(a.accident_id) AS subdist_total_cases
             FROM subdistricts s
-            LEFT JOIN accidents a ON s.code = a.subdistrict_code
-            WHERE FLOOR(s.code / 100) = ?
-            GROUP BY s.code, s.name_in_thai;
+            LEFT JOIN accidents a 
+              ON s.subdistrict_code = a.subdistrict_code
+            WHERE s.district_code = ?
+            GROUP BY s.subdistrict_code, s.name_in_thai
+            ORDER BY s.name_in_thai ASC;
         `;
 
         const [rows] = await db.query(query, [district_code]);
         res.json(rows);
-        
+
     } catch (err) {
         console.error("Error fetching subdistricts:", err);
         res.status(500).json({ error: 'Internal Server Error' });
