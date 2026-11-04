@@ -9,45 +9,45 @@
   },
   "time_period": "เช้า (08:00 - 11:59)",
   "day_type": "new_year",
-  "risk_score": 26.17,
+  "risk_score": 26.19,
   "risk_level": "ต่ำ",
-  "shap_base_value": 40.318128505550085,
-  "raw_prediction": 26.170353126472484,
+  "shap_base_value": 40.32422772693081,
+  "raw_prediction": 26.192480274125984,
   "shap_factors": [
-    {
-      "feature": "district_code",
-      "value": "1105",
-      "shap_value": -8.049084,
-      "direction": "decreases_prediction"
-    },
     {
       "feature": "subdist_total_cases",
       "value": 11,
-      "shap_value": -8.015248,
+      "shap_value": -7.942034,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "district_code",
+      "value": "1105",
+      "shap_value": -7.639189,
       "direction": "decreases_prediction"
     },
     {
       "feature": "province_code",
       "value": "11",
-      "shap_value": 2.584826,
+      "shap_value": 2.213558,
       "direction": "increases_prediction"
     },
     {
       "feature": "day_type",
       "value": "new_year",
-      "shap_value": -0.430495,
-      "direction": "decreases_prediction"
-    },
-    {
-      "feature": "time_period",
-      "value": "เช้า (08:00 - 11:59)",
-      "shap_value": -0.129541,
+      "shap_value": -0.466952,
       "direction": "decreases_prediction"
     },
     {
       "feature": "subdistrict_code",
       "value": "110505",
-      "shap_value": -0.108233,
+      "shap_value": -0.176883,
+      "direction": "decreases_prediction"
+    },
+    {
+      "feature": "time_period",
+      "value": "เช้า (08:00 - 11:59)",
+      "shap_value": -0.120247,
       "direction": "decreases_prediction"
     }
   ]
