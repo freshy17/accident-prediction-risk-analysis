@@ -124,7 +124,7 @@ function AdminUpload() {
         }
 
         if (file.size > MAX_FILE_SIZE) {
-            setError('ไฟล์ใหญ่เกิน 10 MB');
+            setError('ไฟล์ใหญ่เกิน 50 MB');
             return;
         }
 
