@@ -350,67 +350,90 @@ router.post('/add-data', verifyToken, requireAdmin,
             }
 
             //กันข้อมูลซ้ำ: คีย์ที่ใช้ระบุว่าเป็นเหตุการณ์เดียวกัน
-            const DEDUP_KEYS = ['latitude', 'longitude', 'year', 'month', 'day', 'hour', 'road_name', 'vehicle']
-                .filter(k => useCols.includes(k));
-            const canDedup = DEDUP_KEYS.length === 8;
+            const ALL_DEDUP_KEYS = ['latitude', 'longitude', 'year', 'month', 'day', 'hour', 'road_name', 'vehicle'];
+            const missingKeys = ALL_DEDUP_KEYS.filter(k => !useCols.includes(k));
+            const canDedup = missingKeys.length === 0;
 
-            let rowsToInsert = records;
-            let skippedDuplicates = 0;
-
-            if (canDedup) {
-                const keyOf = (r) => DEDUP_KEYS.map(k => {
-                    const v = r[k];
-                    //ตัวเลขเทียบเป็นตัวเลข กัน 18.66476 กับ 18.664760 ไม่ตรงกัน
-                    return (['latitude', 'longitude', 'year', 'month', 'day', 'hour'].includes(k) && v !== '')
-                        ? String(Number(v)) : String(v ?? '').trim();
-                }).join('|');
-
-                //1)ตัดซ้ำภายในไฟล์ (เก็บแถวแรก)
-                const seen = new Set();
-                const uniqueInFile = [];
-                for (const r of records) {
-                    const k = keyOf(r);
-                    if (!seen.has(k)) { seen.add(k); uniqueInFile.push(r); }
-                }
-
-                //2)ตัดแถวที่มีอยู่ในตารางแล้ว (ดึงเฉพาะปีที่อยู่ในไฟล์)
-                const years = [...new Set(uniqueInFile.map(r => Number(r.year)).filter(Number.isFinite))];
-                const existing = new Set();
-                if (years.length > 0) {
-                    const [exRows] = await db.query(
-                        `SELECT ${DEDUP_KEYS.map(k => `\`${k}\``).join(', ')}
-                         FROM accidents WHERE year IN (?)`, [years]);
-                    for (const r of exRows) existing.add(keyOf(r));
-                }
-
-                rowsToInsert = uniqueInFile.filter(r => !existing.has(keyOf(r)));
-                skippedDuplicates = records.length - rowsToInsert.length;
+            if (!canDedup) {
+                return res.status(422).json({
+                    success: false,
+                    message: `ตรวจข้อมูลซ้ำไม่ได้ (ขาดคอลัมน์: ${missingKeys.join(', ')}) จึงยกเลิกการบันทึก`
+                });
             }
 
-            //insert เป็นชุด ใน transaction (ถ้าพังกลางทางจะ rollback ทั้งหมด)
+            //1)ตัดแถวที่ซ้ำกันเองภายในไฟล์ (ไฟล์เดียวกัน ค่าจึงเทียบกันตรง ๆ ได้)
+            const keyOf = (r) => ALL_DEDUP_KEYS.map(k => {
+                const v = r[k];
+                if (v === null || v === undefined || String(v).trim() === '') return '';
+                if (k === 'latitude' || k === 'longitude') return Number(v).toFixed(5);
+                if (['year', 'month', 'day', 'hour'].includes(k)) return String(Number(v));
+                return String(v).trim();
+            }).join('|');
+
+            const seen = new Set();
+            const rowsToInsert = [];
+            for (const r of records) {
+                const k = keyOf(r);
+                if (!seen.has(k)) { seen.add(k); rowsToInsert.push(r); }
+            }
+
+            //2)เทียบกับข้อมูลเดิมใน DB ด้วย SQL (DB เทียบกับ DB) ผ่านตารางชั่วคราว
             const conn = await db.getConnection();
             let inserted = 0;
             let firstInsertId = null;
             try {
+                await conn.query('DROP TEMPORARY TABLE IF EXISTS tmp_upload');
+                await conn.query('CREATE TEMPORARY TABLE tmp_upload LIKE accidents');
                 await conn.beginTransaction();
-                const colSql = useCols.map(c => `\`${c}\``).join(', ');
 
+                const colSql = useCols.map(c => `\`${c}\``).join(', ');
+                const selSql = useCols.map(c => `t.\`${c}\``).join(', ');
+
+                //ใส่ไฟล์ทั้งหมดลงตารางชั่วคราวก่อน
                 for (let i = 0; i < rowsToInsert.length; i += 1000) {
                     const chunk = rowsToInsert.slice(i, i + 1000)
                         .map(r => useCols.map(c => (r[c] === '' ? null : r[c])));
-                    const [result] = await conn.query(
-                        `INSERT INTO accidents (${colSql}) VALUES ?`, [chunk]);
-                    inserted += result.affectedRows;
-                    if (firstInsertId === null) firstInsertId = result.insertId;
+                    await conn.query(`INSERT INTO tmp_upload (${colSql}) VALUES ?`, [chunk]);
+                }
+
+                //ย้ายเฉพาะแถวที่ยังไม่มีใน accidents
+                const [result] = await conn.query(`
+                    INSERT INTO accidents (${colSql})
+                    SELECT ${selSql} FROM tmp_upload t
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM accidents a
+                        WHERE a.year  <=> t.year
+                        AND a.month <=> t.month
+                        AND a.day   <=> t.day
+                        AND a.hour  <=> t.hour
+                        AND ROUND(a.latitude, 5)  <=> ROUND(t.latitude, 5)
+                        AND ROUND(a.longitude, 5) <=> ROUND(t.longitude, 5)
+                        AND a.road_name <=> t.road_name
+                        AND a.vehicle   <=> t.vehicle
+                    )
+                    ORDER BY t.accident_id`);
+                inserted = result.affectedRows;
+                firstInsertId = result.insertId || null;
+
+                //ไม่มีแถวใหม่เลย = ไฟล์ซ้ำทั้งหมด
+                if (inserted === 0) {
+                    await conn.rollback();
+                    return res.status(409).json({
+                        success: false,
+                        message: `ไฟล์นี้มีข้อมูลอยู่ในระบบแล้วทั้งหมด (${records.length} แถว) ไม่มีการเพิ่มข้อมูล`
+                    });
                 }
 
                 await conn.commit();
             } catch (e) {
                 await conn.rollback();
-                throw e; //ส่งต่อให้ catch ด้านนอกตอบ error
+                throw e;
             } finally {
+                try { await conn.query('DROP TEMPORARY TABLE IF EXISTS tmp_upload'); } catch (_) {}
                 conn.release();
             }
+            const skippedDuplicates = records.length - inserted;
+
 
             //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์ 
             let scoreStatus = 'skipped'; //ยังไม่มีข้อมูลใหม่
@@ -427,12 +450,13 @@ router.post('/add-data', verifyToken, requireAdmin,
                     scoreStatus = 'failed';
                 }
             }
-
-            //สรุปข้อมูลที่เพิ่งเพิ่ม (ถ้าสรุปพัง ไม่ให้การอัปโหลดล้มเหลว)
+            
             let summary = null;
             if (inserted > 0) {
                 try {
-                    summary = await buildInsertSummary(rowsToInsert, firstInsertId);
+                    const [newRows] = await db.query(
+                        'SELECT * FROM accidents WHERE accident_id >= ?', [firstInsertId]);
+                    summary = await buildInsertSummary(newRows, firstInsertId);
                 } catch (e) {
                     console.error('summary error:', e.message);
                 }
