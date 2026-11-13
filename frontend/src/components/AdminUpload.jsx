@@ -285,7 +285,7 @@ function AdminUpload() {
             </div>
 
             <div className="admin-form-container retrain-card">
-                <h2>ทดลองรีเทรนโมเดล</h2>
+                <h2>รีเทรนโมเดล</h2>
 
                 <p className="retrain-desc">
                     ให้โมเดล LightGBM เรียนรู้ใหม่จากข้อมูลอุบัติเหตุทั้งหมดในฐานข้อมูล แล้วแสดงผลวัดความแม่นยำ
@@ -303,7 +303,7 @@ function AdminUpload() {
                     onClick={handleRetrain}
                     disabled={isTraining || retrainBusy}
                 >
-                    {isTraining ? 'กำลังเทรนโมเดล...' : 'ทดลองรีเทรน'}
+                    {isTraining ? 'กำลังเทรนโมเดล...' : 'รีเทรนโมเดล'}
                 </button>
 
                 {isTraining && (
