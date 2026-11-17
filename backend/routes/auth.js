@@ -50,6 +50,18 @@ const upload = multer({
     }
 });
 
+let activeJob = null; //
+const JOB_LABEL = { upload: 'อัปโหลดข้อมูล', retrain: 'รีเทรนโมเดล' };
+
+const tryAcquireJob = (type, by) => {
+    if (activeJob) return false;
+    activeJob = { type, by, startedAt: Date.now() };
+    return true;
+};
+const releaseJob = () => { activeJob = null; };
+const busyMessage = () =>
+    `ระบบกำลัง${JOB_LABEL[activeJob.type]}อยู่ (โดย ${activeJob.by}) กรุณารอให้เสร็จก่อน`;
+
 //Middleware ตรวจสอบ Token แอดมิน
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -240,6 +252,13 @@ router.post('/add-data', verifyToken, requireAdmin,
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'ไม่พบไฟล์ที่อัปโหลด' });
         }
+
+        //ขอล็อก: ถ้ามีงานอื่นทำอยู่ (อัปโหลดหรือรีเทรน) ให้ปฏิเสธ
+        if (!tryAcquireJob('upload', req.user.username)) {
+            fs.unlink(req.file.path, () => {}); //ลบไฟล์ที่ multer เก็บไว้แล้ว
+            return res.status(409).json({ success: false, message: busyMessage() });
+        }
+
         const inputPath = req.file.path;
         const outputPath = `${inputPath}_cleaned.csv`;
 
@@ -284,20 +303,18 @@ router.post('/add-data', verifyToken, requireAdmin,
                     if (code) {
                         r.province_code = code;
                     } else {
-                        r.province_code = '';   //บันทึกเป็น NULL
+                        r.province_code = '';  
                         const raw = String(r['จังหวัด'] ?? '').trim();
                         if (raw && raw !== 'ไม่ระบุ') unmatchedProvinces.add(raw);
                     }
                 }
             }
 
-            //เติมรหัสอำเภอ/ตำบล/ชื่อตำบล จากพิกัดด้วย polygon (point-in-polygon ผ่าน geo_assign.py)
-            //ใช้เฉพาะเมื่อไฟล์ไม่มี subdistrict_code มาให้ และมีพิกัดครบ
-            //ไม่ต้องใช้ province_code ในการหา เพราะ polygon บอกพื้นที่จากพิกัดโดยตรง
-            let geoMatched = 0;   //แถวที่ได้รหัสตำบลทั้งหมด (polygon + nearest)
-            let geoFar = 0;       //แถวที่พิกัดไม่ตกใน polygon ตำบลใด ต้องใช้ตำบลที่ใกล้ที่สุด (ไม่เกิน ~5 กม.)
-            let geoDistrictOnly = 0; //ได้แค่รหัสอำเภอ
-            let geoUnmatched = 0; //ไม่ได้อะไรเลย
+            //เติมรหัสอำเภอ/ตำบล/ชื่อตำบล จากพิกัดด้วย polygon 
+            let geoMatched = 0;   
+            let geoFar = 0;       
+            let geoDistrictOnly = 0; 
+            let geoUnmatched = 0; 
             if ('latitude' in records[0] && 'longitude' in records[0]
                 && !('subdistrict_code' in records[0])) {
                 const geoPath = `${inputPath}_geo.csv`;
@@ -361,7 +378,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 });
             }
 
-            //1)ตัดแถวที่ซ้ำกันเองภายในไฟล์ (ไฟล์เดียวกัน ค่าจึงเทียบกันตรง ๆ ได้)
+            //1)ตัดแถวที่ซ้ำกันเองภายในไฟล์ 
             const keyOf = (r) => ALL_DEDUP_KEYS.map(k => {
                 const v = r[k];
                 if (v === null || v === undefined || String(v).trim() === '') return '';
@@ -377,7 +394,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 if (!seen.has(k)) { seen.add(k); rowsToInsert.push(r); }
             }
 
-            //2)เทียบกับข้อมูลเดิมใน DB ด้วย SQL (DB เทียบกับ DB) ผ่านตารางชั่วคราว
+            //2)เทียบกับข้อมูลเดิมใน DB ผ่านตารางชั่วคราว
             const conn = await db.getConnection();
             let inserted = 0;
             let firstInsertId = null;
@@ -434,9 +451,8 @@ router.post('/add-data', verifyToken, requireAdmin,
             }
             const skippedDuplicates = records.length - inserted;
 
-
             //คำนวณ risk_score ลง summaries เฉพาะปีที่อยู่ในไฟล์ 
-            let scoreStatus = 'skipped'; //ยังไม่มีข้อมูลใหม่
+            let scoreStatus = 'skipped'; 
             const yearsInFile = [...new Set(
                 rowsToInsert.map(r => Number(r.year)).filter(Number.isFinite)
             )];
@@ -492,6 +508,7 @@ router.post('/add-data', verifyToken, requireAdmin,
                 message: `เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${error.sqlMessage || error.message}`
             });
         } finally {
+            releaseJob(); //ปล่อยล็อกเสมอ แม้ error หรือ return กลางทาง
             //ลบไฟล์ชั่วคราวทุกครั้ง
             fs.unlink(inputPath, () => {}); //ไฟล์ที่อัปโหลดมา
             fs.unlink(outputPath, () => {}); //ไฟล์หลังคลีนข้อมูล
@@ -523,12 +540,13 @@ const scrubSecrets = (text) => {
     return pw ? text.split(pw).join('***') : text;
 };
 
-// สั่งเทรน
+//สั่งเทรน
 router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
-    if (retrainState.status === 'running') {
+    //ขอล็อก: ถ้ากำลังเทรนหรืออัปโหลดอยู่ ให้ปฏิเสธ
+    if (!tryAcquireJob('retrain', req.user.username)) {
         return res.status(409).json({
             success: false,
-            message: 'กำลังเทรนอยู่ กรุณารอให้เสร็จก่อน',
+            message: busyMessage(),
             ...publicRetrainState()
         });
     }
@@ -544,6 +562,8 @@ router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     }, (err, stdout, stderr) => {
         const finishedAt = Date.now();
+        releaseJob(); //ปล่อยล็อกทุกกรณี (สำเร็จ/ล้มเหลว/timeout)
+
         const line = String(stdout || '').split(/\r?\n/).reverse()
             .find(l => l.startsWith(RETRAIN_RESULT_PREFIX));
 
@@ -573,7 +593,11 @@ router.post('/retrain', verifyToken, requireAdmin, (req, res) => {
 });
 
 router.get('/retrain/status', verifyToken, requireAdmin, (req, res) => {
-    res.json({ success: true, ...publicRetrainState() });
+    res.json({
+        success: true,
+        ...publicRetrainState(),
+        busyJob: activeJob ? { type: activeJob.type, by: activeJob.by } : null
+    });
 });
 
 //ดูรายชื่อแอดมิน

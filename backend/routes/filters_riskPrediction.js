@@ -2,6 +2,22 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
+const DAY_START_HOUR = 4;
+const startHour = (label) => {
+    const m = String(label).match(/(\d{1,2}):(\d{2})/);
+    if (!m) return 999; 
+    const h = Number(m[1]) + Number(m[2]) / 60;
+    return h < DAY_START_HOUR ? h + 24 : h;
+};
+const sortTimePeriods = (list) => [...list].sort((a, b) => startHour(a) - startHour(b));
+
+//เรียงประเภทวันตามลำดับคงที่ ค่าใหม่ที่ไม่รู้จักไปอยู่ท้าย
+const DAY_TYPE_ORDER = ['normal_day', 'weekend', 'new_year', 'songkran'];
+const sortDayTypes = (list) => {
+    const rank = (d) => { const i = DAY_TYPE_ORDER.indexOf(d); return i === -1 ? 999 : i; };
+    return [...list].sort((a, b) => rank(a) - rank(b));
+};
+
 //GET /api/filters/options
 router.get('/options', async (req, res) => {
     try {
@@ -16,10 +32,10 @@ router.get('/options', async (req, res) => {
         const [dayTypes] = await db.query("SELECT DISTINCT day_type FROM accidents WHERE day_type IS NOT NULL ORDER BY day_type ASC");
 
         res.json({
-            provinces, 
-            timeRanges: timeRanges.map(i => i.time_period),
-            dayTypes: dayTypes.map(i => i.day_type),
-        });
+        provinces,
+        timeRanges: sortTimePeriods(timeRanges.map(i => i.time_period)),
+        dayTypes: sortDayTypes(dayTypes.map(i => i.day_type)),
+    });
     } catch (err) {
         console.error("Error fetching options:", err);
         res.status(500).json({ error: 'Internal Server Error'  });

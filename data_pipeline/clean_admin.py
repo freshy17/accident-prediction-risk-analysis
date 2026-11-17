@@ -67,18 +67,21 @@ def clean_time_str(val):
 def get_time_period(hour):
     if pd.isna(hour) or hour < 0:
         return 'ไม่ระบุ'
-    elif 0 <= hour < 4:
-        return 'ดึก (00:00 - 03:59)'
-    elif 4 <= hour < 8:
-        return 'เช้ามืด (04:00 - 07:59)'
-    elif 8 <= hour < 12:
-        return 'เช้า (08:00 - 11:59)'
-    elif 12 <= hour < 16:
-        return 'บ่าย (12:00 - 15:59)'
-    elif 16 <= hour < 20:
-        return 'เย็น (16:00 - 19:59)'
+    elif 4 <= hour < 6:
+        return 'เช้ามืด (04:00 - 05:59)'
+    elif 6 <= hour < 9:
+        return 'เช้า (06:00 - 08:59)'
+    elif 9 <= hour < 12:
+        return 'สาย (09:00 - 11:59)'
+    elif 12 <= hour < 13:
+        return 'กลางวัน (12:00 - 12:59)'
+    elif 13 <= hour < 16:
+        return 'บ่าย (13:00 - 15:59)'
+    elif 16 <= hour < 19:
+        return 'เย็น (16:00 - 18:59)'
     else:
-        return 'กลางคืน (20:00 - 23:59)'
+        # 19:00 - 23:59 และ 00:00 - 03:59
+        return 'กลางคืน (19:00 - 03:59)'
 
 
 def calculate_severity(row):

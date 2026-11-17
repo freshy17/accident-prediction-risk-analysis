@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getFilterOptions, getDistrictsByProvinceCode, getRiskPrediction, getSubdistrictsByDistrictCode, getRiskExplanation, getRiskModels } from "../api/apiService";
+import { DAY_TYPE_MAP } from "../utils/labels";
 
-const DAY_TYPE_MAP = {
-  'normal_day': 'วันธรรมดา (จ.-ศ.)',
-  'weekend': 'วันหยุดสุดสัปดาห์ (ส.-อา.)',
-  'new_year': 'เทศกาลปีใหม่',
-  'songkran': 'เทศกาลสงกรานต์'
-};
- 
 const FEATURE_LABELS = {
   province_code: 'จังหวัด',
   district_code: 'อำเภอ',
@@ -17,7 +11,7 @@ const FEATURE_LABELS = {
   subdist_total_cases: 'จำนวนอุบัติเหตุสะสมในตำบล',
 };
 
-//โมเดลหลักที่ใช้งานจริง (ค่าเริ่มต้นของ dropdown เลือกโมเดล)
+//โมเดลหลัก
 const DEFAULT_MODEL_ID = 'default';
 
 const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -55,6 +49,208 @@ const getModelDetail = (model) => {
   if (metrics && metrics.test_mae != null) parts.push(`MAE ${metrics.test_mae.toFixed(2)}`);
   return parts.join(' · ');
 };
+
+//รวมปัจจัยที่เกี่ยวข้องกันเป็นกลุ่มเดียว (จังหวัด+อำเภอ+ตำบล = พื้นที่)
+const SHAP_GROUP = {
+  province_code: 'area',
+  district_code: 'area',
+  subdistrict_code: 'area',
+  subdist_total_cases: 'cases',
+  time_period: 'time',
+  day_type: 'day',
+};
+
+const GROUP_LABEL = {
+  area: 'พื้นที่',
+  cases: 'จำนวนอุบัติเหตุสะสมในตำบล',
+  time: 'ช่วงเวลา',
+  day: 'ประเภทวัน',
+};
+
+//เกณฑ์แปลงสัดส่วนอิทธิพลเป็นคำ 
+const SHARE_HIGH = 0.4;
+const SHARE_MID = 0.15;
+
+const LEVEL_TH = { High: 'สูง', Medium: 'ปานกลาง', Low: 'ต่ำ' };
+
+//แปลง shap_values ดิบจาก API เป็นกลุ่มปัจจัยที่อ่านง่าย
+const buildShapGroups = (shapValues, inputs) => {
+  const map = new Map();
+  for (const item of shapValues || []) {
+    const key = SHAP_GROUP[item.feature] ?? item.feature;
+    const value = Number(item.value) || 0;
+    if (map.has(key)) {
+      map.get(key).value += value;
+    } else {
+      map.set(key, {
+        key,
+        label: GROUP_LABEL[key] ?? FEATURE_LABELS[item.feature] ?? item.feature,
+        value,
+      });
+    }
+  }
+
+  const detailOf = (key) => {
+    if (key === 'area') return inputs.areaName;
+    if (key === 'cases') return `${Number(inputs.totalCases || 0).toLocaleString()} ครั้ง`;
+    if (key === 'time') return inputs.timeRange;
+    if (key === 'day') return inputs.dayTypeLabel;
+    return '';
+  };
+  const phraseOf = (key, detail) => {
+    if (key === 'area') return `พื้นที่ (${detail})`;
+    if (key === 'cases') return `จำนวนอุบัติเหตุสะสมในตำบลนี้ (${detail})`;
+    if (key === 'time') return `ช่วงเวลา ${detail}`;
+    if (key === 'day') return detail;
+    return FEATURE_LABELS[key] ?? key;
+  };
+
+  const groups = [...map.values()];
+  const total = groups.reduce((s, g) => s + Math.abs(g.value), 0);
+
+  return groups
+    .map((g) => {
+      const detail = detailOf(g.key);
+      const share = total > 0 ? Math.abs(g.value) / total : 0;
+      const levelText = share >= SHARE_HIGH ? 'มีผลมาก' : share >= SHARE_MID ? 'มีผลปานกลาง' : 'มีผลเล็กน้อย';
+      return { ...g, detail, phrase: phraseOf(g.key, detail), share, levelText, size: share >= SHARE_HIGH ? 'high' : share >= SHARE_MID ? 'mid' : 'small' };
+    })
+    .sort((a, b) => b.share - a.share);
+};
+
+//สร้างประโยคสรุปสั้น ๆ ให้อ่านแล้วเข้าใจทันที
+const buildShapSummary = (groups, level) => {
+  const lv = LEVEL_TH[level] || level;
+  const raising = groups.filter((g) => g.value > 0);
+  const lowering = groups.filter((g) => g.value < 0);
+
+  if (raising.length === 0) {
+    return `จากข้อมูลที่เลือก ไม่มีปัจจัยใดที่ทำให้ความเสี่ยงสูงกว่าค่าเฉลี่ยของโมเดล ระดับความเสี่ยงจึงอยู่ที่ ${lv}`;
+  }
+
+  const top = raising[0];
+  const parts = [];
+  if (top.size === 'high') {
+    parts.push(`ความเสี่ยงระดับ${lv}ครั้งนี้มาจาก${top.phrase}เป็นหลัก ตามสถิติอุบัติเหตุในอดีต`);
+  } else {
+    parts.push(`ความเสี่ยงระดับ${lv}ครั้งนี้มาจากหลายปัจจัยรวมกัน โดยเด่นที่สุดคือ${top.phrase}`);
+  }
+
+  const others = groups.filter((g) => g !== top);
+  if (others.length > 0 && others.every((g) => g.size === 'small')) {
+    parts.push('ส่วนปัจจัยอื่นมีผลเล็กน้อย');
+  } else if (lowering.length > 0 && lowering[0].size !== 'small') {
+    parts.push(`ส่วน${lowering[0].phrase}ช่วยลดความเสี่ยงลงได้บ้าง`);
+  }
+  return parts.join(' ');
+};
+
+const COLOR_UP = '#ef4444';
+const COLOR_DOWN = '#16a34a';
+
+function ShapRow({ g, color }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <span>
+          <strong>{g.label}</strong>
+          {g.detail && <span style={{ color: '#4b5563' }}>: {g.detail}</span>}
+        </span>
+        <span style={{ color, fontWeight: 600, whiteSpace: 'nowrap' }}>{g.levelText}</span>
+      </div>
+      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, marginTop: 4 }}>
+        <div style={{ width: `${Math.max(g.share * 100, 3)}%`, height: '100%', background: color, borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
+function ShapSection({ title, hint, color, list }) {
+  if (list.length === 0) return null;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontWeight: 700, color }}>{title}</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>{hint}</div>
+      {list.map((g) => <ShapRow key={g.key} g={g} color={color} />)}
+    </div>
+  );
+}
+
+function ExplainCard({ result }) {
+  const raising = result.groups.filter((g) => g.value > 0);
+  const lowering = result.groups.filter((g) => g.value < 0);
+
+  return (
+    <div className="shap-card">
+      <h3 className="shap-title">ทำไมถึงได้คะแนนนี้?</h3>
+
+      {/* แสดงเฉพาะประโยคสรุป */}
+      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', lineHeight: 1.6 }}>
+        {result.summaryText}
+      </div>
+
+      {/* รายละเอียดทั้งหมดซ่อนไว้ ให้กดดูเอง */}
+      <details style={{ marginTop: 12 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 14, color: '#4b5563' }}>
+          ดูรายละเอียด
+        </summary>
+
+        <p style={{ fontSize: 14, color: '#4b5563', margin: '12px 0 0' }}>
+          ระบบเรียนรู้จากสถิติอุบัติเหตุในอดีต ปัจจัยด้านล่างคือสิ่งที่ทำให้คะแนนสูงขึ้นหรือต่ำลง
+        </p>
+
+        <ShapSection
+          title="ทำให้ความเสี่ยงสูงขึ้น"
+          hint="ปัจจัยที่ดันคะแนนให้สูงกว่าค่าเฉลี่ย"
+          color={COLOR_UP}
+          list={raising}
+        />
+        <ShapSection
+          title="ช่วยให้ความเสี่ยงต่ำลง"
+          hint="ปัจจัยที่ดันคะแนนให้ต่ำกว่าค่าเฉลี่ย"
+          color={COLOR_DOWN}
+          list={lowering}
+        />
+
+        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12 }}>
+          เป็นการอธิบายสิ่งที่โมเดลเรียนรู้จากสถิติในอดีต ไม่ได้บอกว่าปัจจัยนั้นเป็นสาเหตุของอุบัติเหตุ
+          ข้อเสนอแนะด้านล่างอ้างอิงจากปัจจัยที่มีผลมากที่สุดข้างต้น
+        </p>
+
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 14, color: '#4b5563' }}>
+            ข้อมูลทางเทคนิค (ค่า SHAP)
+          </summary>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '8px 0' }}>
+            ค่า SHAP คือค่าที่บอกว่าแต่ละปัจจัยดันผลพยากรณ์ขึ้น (ค่าบวก) หรือลง (ค่าลบ) เท่าไร
+            ยิ่งตัวเลขห่างจาก 0 มาก ยิ่งมีอิทธิพลมาก
+          </p>
+          <div className="shap-list">
+            {result.shapeValues.map((item, idx) => (
+              <div key={idx} className="shap-item">
+                <div className="shap-label-side">
+                  <span className={item.type === 'positive' ? 'dot-positive' : 'dot-negative'} />
+                  <span>{item.label}</span>
+                </div>
+                <div className="shap-bar-side">
+                  <div className="bar-bg">
+                    <div
+                      className={item.type === 'positive' ? 'bar-fill-positive' : 'bar-fill-negative'}
+                      style={{ width: `${Math.min(Math.abs(item.value) * 5, 100)}%` }}
+                    />
+                  </div>
+                  <span className={item.type === 'positive' ? 'shap-val-pos' : 'shap-val-neg'}>
+                    {item.value > 0 ? `+${item.value}` : item.value}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      </details>
+    </div>
+  );
+}
 
 function RiskPrediction() {
     const [options, setOptions] = useState({
@@ -291,6 +487,19 @@ const fetchExplanation = async (data) => {
                         return Math.abs(b.value) - Math.abs(a.value);
                     });
 
+                //เก็บค่าที่ผู้ใช้เลือกไว้ ณ ตอนพยากรณ์ (เพื่อให้คำอธิบายตรงกับผล แม้ผู้ใช้เปลี่ยนฟอร์มทีหลัง)
+                const provName = options.provinces.find(p => String(p.province_code) === String(formData.province_code))?.pro_name_th;
+                const distName = districts.find(d => String(d.district_code) === String(formData.district_code))?.dis_name_th;
+                const subName = subdistricts.find(s => String(s.subdistrict_code) === String(formData.subdistrict_code))?.sub_name_th;
+                const inputs = {
+                    areaName: [subName && `ต.${subName}`, distName && `อ.${distName}`, provName && `จ.${provName}`].filter(Boolean).join(' '),
+                    totalCases: formData.subdist_total_cases,
+                    timeRange: formData.timeRange,
+                    dayTypeLabel: DAY_TYPE_MAP[formData.dayType] || formData.dayType,
+                };
+                const groups = buildShapGroups(data.shap_values, inputs);
+                const summaryText = buildShapSummary(groups, data.risk_level);
+
                     let recText = "ระดับความเสี่ยงอยู่ในเกณฑ์ต่ำ ควรขับขี่ด้วยความไม่ประมาทและปฏิบัติตามกฎจราจรในช่วงเวลาที่เลือก";
                     if (data.risk_level === 'High') {
                         recText = "ระดับความเสี่ยงสูงมาก! ควรเพิ่มความระมัดระวังในการเดินทางสูงสุดในช่วงเวลาและประเภทวันที่เลือก พร้อมกวดขันวินัยจราจรและตรวจสอบจุดเสี่ยงในพื้นที่";
@@ -302,6 +511,8 @@ const fetchExplanation = async (data) => {
                     score: data.risk_score,
                     level: data.risk_level,
                     shapeValues: formattedShap,
+                    groups,
+                    summaryText,
                     recommendation: recText,
                     //เก็บชื่อโมเดลที่ใช้ทำนายครั้งนี้ไว้แสดงในผลลัพธ์
                     modelLabel: getModelLabel(models.find(m => m.id === selectedModelId))
@@ -495,31 +706,8 @@ const fetchExplanation = async (data) => {
                                 </div>
                             </div>
 
-                            {/* Card 2: SHAP Value */}
-                            <div className="shap-card">
-                                <h3 className="shap-title">ปัจจัยที่มีผลต่อการพยากรณ์ (SHAP Values)</h3>
-                                <div className="shap-list">
-                                    {result.shapeValues.map((item, idx) => (
-                                        <div key={idx} className="shap-item">
-                                            <div className="shap-label-side">
-                                                <span className={item.type === 'positive' ? 'dot-positive' : 'dot-negative'} />
-                                                <span>{item.label}</span>
-                                            </div>
-                                            <div className="shap-bar-side">
-                                                <div className="bar-bg">
-                                                        <div
-                                                            className={item.type === 'positive' ? 'bar-fill-positive' : 'bar-fill-negative'}
-                                                            style={{ width: `${Math.min(Math.abs(item.value) * 5, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                <span className={item.type === 'positive' ? 'shap-val-pos' : 'shap-val-neg'}>
-                                                    {item.value > 0 ? `+${item.value}` : item.value}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            {/* Card 2: ทำไมถึงได้คะแนนนี้ (อธิบายค่า SHAP ให้คนทั่วไปเข้าใจ) */}
+                            {/* <ExplainCard result={result} /> */}
 
                             {/* Card 3: Recommendation */}
                             <div className="recommend-card">

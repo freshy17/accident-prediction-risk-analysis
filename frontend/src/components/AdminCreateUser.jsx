@@ -6,10 +6,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const MIN_PASSWORD_LENGTH = 8;
 const NEW_USER_ROLE = 'admin';
 
-//อ่าน userId ของคนที่ล็อกอินอยู่จาก token (ใช้ซ่อนปุ่มลบของตัวเอง ฝั่งเซิร์ฟเวอร์กันซ้ำอีกชั้น)
+//อ่าน userId ของคนที่ล็อกอินอยู่จาก token 
 const getMyUserId = () => {
     try {
-        const token = localStorage.getItem('adminToken');
+        const token = sessionStorage.getItem('adminToken');
+        if (!token) return null;
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         return payload.userId;
     } catch {
@@ -37,8 +38,21 @@ function AdminCreateUser() {
     const [listLoading, setListLoading] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
 
+    const resetForm = () => {
+        setUsername('');
+        setPassword('');
+        setConfirmPassword('');
+    };
+
+    const closeModal = () => {
+        setOpen(false);
+        setMessage('');
+        setError('');
+        resetForm();
+    };
+
     const fetchUsers = async () => {
-        const token = localStorage.getItem('adminToken');
+        const token = sessionStorage.getItem('adminToken');
         if (!token) return;
         setListLoading(true);
         try {
@@ -59,7 +73,6 @@ function AdminCreateUser() {
         if (open) fetchUsers();
     }, [open]);
 
-    //กด Esc เพื่อปิดหน้าต่าง
     useEffect(() => {
         if (!open) return;
         const onKey = (e) => { if (e.key === 'Escape') closeModal(); };
@@ -67,28 +80,15 @@ function AdminCreateUser() {
         return () => window.removeEventListener('keydown', onKey);
     }, [open]);
 
-    if (localStorage.getItem('adminRole') !== 'admin') return null;
+    if (sessionStorage.getItem('adminRole') !== 'admin') return null;
 
     const myId = getMyUserId();
-
-    const resetForm = () => {
-        setUsername('');
-        setPassword('');
-        setConfirmPassword('');
-    };
-
-    const closeModal = () => {
-        setOpen(false);
-        setMessage('');
-        setError('');
-        resetForm();
-    };
 
     const handleDelete = async (u) => {
         if (deletingId) return;
         if (!window.confirm(`ต้องการลบแอดมิน "${u.username}" ใช่ไหม?\nลบแล้วกู้คืนไม่ได้`)) return;
 
-        const token = localStorage.getItem('adminToken');
+        const token = sessionStorage.getItem('adminToken');
         if (!token) {
             setError('กรุณาเข้าสู่ระบบแอดมินก่อน');
             return;
@@ -131,7 +131,7 @@ function AdminCreateUser() {
             return;
         }
 
-        const token = localStorage.getItem('adminToken');
+        const token = sessionStorage.getItem('adminToken');
         if (!token) {
             setError('กรุณาเข้าสู่ระบบแอดมินก่อน');
             return;

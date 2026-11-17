@@ -23,8 +23,8 @@ const AdminLogin = ({ isOpen, onClose, onLoginSuccess }) => {
             });
 
             if(response.data.success) {
-                localStorage.setItem('adminToken', response.data.token);
-                localStorage.setItem('adminRole', response.data.role);
+                sessionStorage.setItem('adminToken', response.data.token);
+                sessionStorage.setItem('adminRole', response.data.role);
 
                 setUsername('');
                 setPassword('');
